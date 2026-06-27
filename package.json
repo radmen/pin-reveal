@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "format": "prettier --write \"**/*.{css,html,js,ts,tsx}\"",
+    "prepare": "husky"
   },
   "dependencies": {
     "@preact/preset-vite": "latest",
@@ -22,10 +24,16 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
+    "husky": "latest",
     "jsdom": "latest",
+    "lint-staged": "latest",
+    "prettier": "latest",
     "typescript": "latest",
     "typescript-eslint": "latest",
     "vite": "latest",
     "vitest": "latest"
+  },
+  "lint-staged": {
+    "*.{css,html,js,ts,tsx}": "prettier --write"
   }
 }
