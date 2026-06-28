@@ -46,7 +46,6 @@ export async function deriveKey(
   username: string
 ): Promise<CryptoKey> {
   const salt = enc('pinapp|v1|salt|' + normalize(username));
-  // ponytail: argon2idAsync yields to event loop internally, so the UI stays live during derivation
   const raw = await argon2idAsync(enc(password), salt, {
     t: 3,
     m: 65536,

@@ -1,7 +1,6 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  deriveKey,
   derivePin,
   forgetKey,
   labelFingerprint,
@@ -145,7 +144,14 @@ export function App(): JSX.Element {
     if (!u || !p) return;
     const t = ++token.current;
     set({ deriving: true });
-    const key = await deriveKey(p, u);
+    const worker = new Worker(new URL('./derive.worker.ts', import.meta.url), {
+      type: 'module'
+    });
+    worker.postMessage({ password: p, username: u });
+    const key = await new Promise<CryptoKey>((resolve) => {
+      worker.onmessage = (event) => resolve(event.data);
+    });
+    worker.terminate();
     if (t !== token.current) return;
     const fp = await loginFingerprint(key);
     if (t !== token.current) return;
@@ -661,11 +667,33 @@ export function App(): JSX.Element {
                     }}
                     style={btnPrimary(loginDisabled)}
                   >
-                    {s.deriving
-                      ? 'Deriving…'
-                      : loginClean
-                        ? 'Proceed →'
-                        : 'Generate fingerprint'}
+                    {s.deriving ? (
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px'
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            border: '2px solid var(--primary-fg)',
+                            borderTopColor: 'transparent',
+                            borderRadius: '50%',
+                            display: 'inline-block',
+                            animation: 'spin .7s linear infinite'
+                          }}
+                        />
+                        Deriving…
+                      </span>
+                    ) : loginClean ? (
+                      'Proceed →'
+                    ) : (
+                      'Generate fingerprint'
+                    )}
                   </button>
                 </div>
               </div>
