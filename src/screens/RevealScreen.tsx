@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { btnPrimary, capLabel } from '../components/styles';
 import { normalize } from '../derive';
 
 interface RevealScreenProps {
@@ -47,32 +48,6 @@ function segBox(active: boolean, shown: boolean): JSX.CSSProperties {
   };
 }
 
-function btnPrimary(disabled: boolean): JSX.CSSProperties {
-  return {
-    width: '100%',
-    padding: '16px',
-    borderRadius: '12px',
-    border: 'none',
-    background: 'var(--primary-bg)',
-    color: 'var(--primary-fg)',
-    fontFamily: "'Space Grotesk',sans-serif",
-    fontWeight: 600,
-    fontSize: '15px',
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.28 : 1,
-    transition: 'opacity .2s,background .25s,color .25s',
-    letterSpacing: '.2px'
-  };
-}
-
-const capLabel: JSX.CSSProperties = {
-  fontFamily: "'Space Mono',monospace",
-  fontSize: '10px',
-  letterSpacing: '2px',
-  color: 'var(--faint)',
-  textTransform: 'uppercase'
-};
-
 export function RevealScreen({
   pin,
   label,
@@ -80,9 +55,9 @@ export function RevealScreen({
   onExit
 }: RevealScreenProps): JSX.Element {
   const segments = useMemo(() => {
-    const segs: string[] = [];
-    for (let i = 0; i < pin.length; i += 2) segs.push(pin.slice(i, i + 2));
-    return segs;
+    const result: string[] = [];
+    for (let i = 0; i < pin.length; i += 2) result.push(pin.slice(i, i + 2));
+    return result;
   }, [pin]);
 
   const [cursor, setCursor] = useState(-1);
@@ -183,12 +158,12 @@ export function RevealScreen({
               maxWidth: '300px'
             }}
           >
-            {segments.map((seg, i) => {
+            {segments.map((segment, i) => {
               const active = i === cursor;
               const shown = active && visible;
               return (
                 <div key={i} style={segBox(active, shown)}>
-                  {shown ? seg : '•'.repeat(seg.length)}
+                  {shown ? segment : '•'.repeat(segment.length)}
                 </div>
               );
             })}

@@ -1,19 +1,12 @@
 import type { JSX } from 'preact';
+import { capLabel } from './styles';
 
 interface MenuDrawerProps {
   revealTime: number;
-  onChangeRevealTime(ms: number): void;
+  onChangeRevealTime(milliseconds: number): void;
   onLogout(): void;
   onClose(): void;
 }
-
-const capLabel: JSX.CSSProperties = {
-  fontFamily: "'Space Mono',monospace",
-  fontSize: '10px',
-  letterSpacing: '2px',
-  color: 'var(--faint)',
-  textTransform: 'uppercase'
-};
 
 function rtBtn(active: boolean): JSX.CSSProperties {
   return {
@@ -106,13 +99,13 @@ export function MenuDrawer({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
           <span style={capLabel}>Reveal time</span>
           <div style={{ display: 'flex', gap: '7px' }}>
-            {([150, 250, 500, 1000] as const).map((ms) => (
+            {([150, 250, 500, 1000] as const).map((milliseconds) => (
               <button
-                key={ms}
-                onClick={() => onChangeRevealTime(ms)}
-                style={rtBtn(revealTime === ms)}
+                key={milliseconds}
+                onClick={() => onChangeRevealTime(milliseconds)}
+                style={rtBtn(revealTime === milliseconds)}
               >
-                {ms}
+                {milliseconds}
               </button>
             ))}
           </div>
@@ -130,9 +123,9 @@ export function MenuDrawer({
               max="5000"
               step="50"
               value={revealTime}
-              onInput={(e) =>
+              onInput={(event) =>
                 onChangeRevealTime(
-                  parseInt((e.target as HTMLInputElement).value) || 0
+                  parseInt((event.target as HTMLInputElement).value) || 0
                 )
               }
               style={{

@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
+import { btnPrimary, capLabel } from '../components/styles';
 import { derivePin, labelFingerprint, normalize } from '../derive';
 
 type LabelState =
@@ -17,8 +18,9 @@ function labelReducer(state: LabelState, action: LabelAction): LabelState {
     case 'start':
       return { kind: 'deriving', runId: action.runId };
     case 'complete':
-      if (state.kind !== 'deriving' || state.runId !== action.runId)
+      if (state.kind !== 'deriving' || state.runId !== action.runId) {
         return state;
+      }
       return {
         kind: 'verified',
         pin: action.pin,
@@ -34,14 +36,6 @@ interface LabelScreenProps {
   onProceed(pin: string, label: string): void;
 }
 
-const capLabel: JSX.CSSProperties = {
-  fontFamily: "'Space Mono',monospace",
-  fontSize: '10px',
-  letterSpacing: '2px',
-  color: 'var(--faint)',
-  textTransform: 'uppercase'
-};
-
 const fieldStyle: JSX.CSSProperties = {
   width: '100%',
   background: 'var(--field)',
@@ -53,24 +47,6 @@ const fieldStyle: JSX.CSSProperties = {
   fontSize: '15px',
   transition: 'border-color .15s,background .25s'
 };
-
-function btnPrimary(disabled: boolean): JSX.CSSProperties {
-  return {
-    width: '100%',
-    padding: '16px',
-    borderRadius: '12px',
-    border: 'none',
-    background: 'var(--primary-bg)',
-    color: 'var(--primary-fg)',
-    fontFamily: "'Space Grotesk',sans-serif",
-    fontWeight: 600,
-    fontSize: '15px',
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.28 : 1,
-    transition: 'opacity .2s,background .25s,color .25s',
-    letterSpacing: '.2px'
-  };
-}
 
 function lenBtn(active: boolean): JSX.CSSProperties {
   return {
@@ -121,20 +97,22 @@ export function LabelScreen({
 
   async function generate() {
     if (labelInvalid) return;
-    const len = customMode ? Math.max(3, Math.min(12, customLen || 0)) : length;
+    const resolvedLength = customMode
+      ? Math.max(3, Math.min(12, customLen || 0))
+      : length;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const [fp, pin] = await Promise.all([
+    const [fingerprint, pin] = await Promise.all([
       labelFingerprint(masterKey, label),
-      derivePin(masterKey, label, len)
+      derivePin(masterKey, label, resolvedLength)
     ]);
-    dispatch({ type: 'complete', runId, pin, fingerprint: fp });
+    dispatch({ type: 'complete', runId, pin, fingerprint });
   }
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         if (disabled) return;
         if (isVerified) onProceed(state.pin, label);
         else void generate();
@@ -174,8 +152,8 @@ export function LabelScreen({
           <label style={capLabel}>Label</label>
           <input
             value={label}
-            onInput={(e) => {
-              setLabel((e.target as HTMLInputElement).value);
+            onInput={(event) => {
+              setLabel((event.target as HTMLInputElement).value);
               resetIfNotIdle();
             }}
             placeholder="e.g. visa, front-door"
@@ -199,18 +177,18 @@ export function LabelScreen({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
           <label style={capLabel}>PIN length</label>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {([4, 6, 8] as const).map((n) => (
+            {([4, 6, 8] as const).map((digits) => (
               <button
                 type="button"
-                key={n}
+                key={digits}
                 onClick={() => {
-                  setLength(n);
+                  setLength(digits);
                   setCustomMode(false);
                   resetIfNotIdle();
                 }}
-                style={lenBtn(!customMode && length === n)}
+                style={lenBtn(!customMode && length === digits)}
               >
-                {n}
+                {digits}
               </button>
             ))}
             <button
@@ -238,9 +216,9 @@ export function LabelScreen({
                 min="3"
                 max="12"
                 value={customLen}
-                onInput={(e) => {
+                onInput={(event) => {
                   setCustomLen(
-                    parseInt((e.target as HTMLInputElement).value) || 0
+                    parseInt((event.target as HTMLInputElement).value) || 0
                   );
                   resetIfNotIdle();
                 }}

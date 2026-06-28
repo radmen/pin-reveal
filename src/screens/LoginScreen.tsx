@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
+import { btnPrimary, capLabel } from '../components/styles';
 import { loginFingerprint } from '../derive';
 
 type LoginState =
@@ -17,8 +18,9 @@ function loginReducer(state: LoginState, action: LoginAction): LoginState {
     case 'start':
       return { kind: 'deriving', runId: action.runId };
     case 'complete':
-      if (state.kind !== 'deriving' || state.runId !== action.runId)
+      if (state.kind !== 'deriving' || state.runId !== action.runId) {
         return state;
+      }
       return {
         kind: 'verified',
         key: action.key,
@@ -33,14 +35,6 @@ interface LoginScreenProps {
   onConfirm(key: CryptoKey): void;
 }
 
-const capLabel: JSX.CSSProperties = {
-  fontFamily: "'Space Mono',monospace",
-  fontSize: '10px',
-  letterSpacing: '2px',
-  color: 'var(--faint)',
-  textTransform: 'uppercase'
-};
-
 const fieldStyle: JSX.CSSProperties = {
   width: '100%',
   background: 'var(--field)',
@@ -52,24 +46,6 @@ const fieldStyle: JSX.CSSProperties = {
   fontSize: '15px',
   transition: 'border-color .15s,background .25s'
 };
-
-function btnPrimary(disabled: boolean): JSX.CSSProperties {
-  return {
-    width: '100%',
-    padding: '16px',
-    borderRadius: '12px',
-    border: 'none',
-    background: 'var(--primary-bg)',
-    color: 'var(--primary-fg)',
-    fontFamily: "'Space Grotesk',sans-serif",
-    fontWeight: 600,
-    fontSize: '15px',
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.28 : 1,
-    transition: 'opacity .2s,background .25s,color .25s',
-    letterSpacing: '.2px'
-  };
-}
 
 const skel = (width: string, height: string): JSX.CSSProperties => ({
   height,
@@ -97,13 +73,13 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
       type: 'module'
     });
     worker.postMessage({ password, username });
-    const key = await new Promise<CryptoKey>((resolve) => {
+    const derivedKey = await new Promise<CryptoKey>((resolve) => {
       worker.onmessage = (event: MessageEvent<CryptoKey>) =>
         resolve(event.data);
     });
     worker.terminate();
-    const fp = await loginFingerprint(key);
-    dispatch({ type: 'complete', runId, key, fingerprint: fp });
+    const fingerprint = await loginFingerprint(derivedKey);
+    dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
   }
 
   function resetIfNotIdle() {
@@ -114,8 +90,8 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         if (disabled) return;
         if (isVerified) onConfirm(state.key);
         else void generate();
@@ -167,8 +143,8 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           <label style={capLabel}>Username</label>
           <input
             value={username}
-            onInput={(e) => {
-              setUsername((e.target as HTMLInputElement).value);
+            onInput={(event) => {
+              setUsername((event.target as HTMLInputElement).value);
               resetIfNotIdle();
             }}
             placeholder="identity"
@@ -182,8 +158,8 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           <input
             type="password"
             value={password}
-            onInput={(e) => {
-              setPassword((e.target as HTMLInputElement).value);
+            onInput={(event) => {
+              setPassword((event.target as HTMLInputElement).value);
               resetIfNotIdle();
             }}
             placeholder="passphrase"

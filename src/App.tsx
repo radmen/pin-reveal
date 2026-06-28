@@ -101,13 +101,13 @@ export function App(): JSX.Element {
       if (saved === 'dark' || saved === 'light') setTheme(saved);
     } catch {}
     loadKey()
-      .then((k) => setKey(k ?? null))
+      .then((loadedKey) => setKey(loadedKey ?? null))
       .catch(() => setKey(null));
   }, []);
 
-  function handleLoginConfirm(k: CryptoKey) {
-    setKey(k);
-    storeKey(k).catch(() => {});
+  function handleLoginConfirm(confirmedKey: CryptoKey) {
+    setKey(confirmedKey);
+    storeKey(confirmedKey).catch(() => {});
   }
 
   function handleLogout() {

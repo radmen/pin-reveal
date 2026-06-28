@@ -61,6 +61,7 @@ export function Topbar({
         {showMenu && (
           <button
             onClick={onOpenMenu}
+            aria-label="Open settings menu"
             style={{
               display: 'flex',
               flexDirection: 'column',
