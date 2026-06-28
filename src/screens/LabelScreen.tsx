@@ -102,11 +102,15 @@ export function LabelScreen({
       : length;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const [fingerprint, pin] = await Promise.all([
-      labelFingerprint(masterKey, label),
-      derivePin(masterKey, label, resolvedLength)
-    ]);
-    dispatch({ type: 'complete', runId, pin, fingerprint });
+    try {
+      const [fingerprint, pin] = await Promise.all([
+        labelFingerprint(masterKey, label),
+        derivePin(masterKey, label, resolvedLength)
+      ]);
+      dispatch({ type: 'complete', runId, pin, fingerprint });
+    } catch {
+      dispatch({ type: 'reset' });
+    }
   }
 
   return (

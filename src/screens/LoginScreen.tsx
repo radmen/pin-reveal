@@ -73,13 +73,21 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
       type: 'module'
     });
     worker.postMessage({ password, username });
-    const derivedKey = await new Promise<CryptoKey>((resolve) => {
-      worker.onmessage = (event: MessageEvent<CryptoKey>) =>
-        resolve(event.data);
-    });
-    worker.terminate();
-    const fingerprint = await loginFingerprint(derivedKey);
-    dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
+    try {
+      const derivedKey = await new Promise<CryptoKey>((resolve, reject) => {
+        worker.onmessage = (event: MessageEvent<CryptoKey>) =>
+          resolve(event.data);
+        worker.onerror = (error) => {
+          worker.terminate();
+          reject(error);
+        };
+      });
+      worker.terminate();
+      const fingerprint = await loginFingerprint(derivedKey);
+      dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
+    } catch {
+      dispatch({ type: 'reset' });
+    }
   }
 
   function resetIfNotIdle() {
