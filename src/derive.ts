@@ -1,33 +1,7 @@
 import { argon2idAsync } from '@noble/hashes/argon2.js';
+import words from './words.json';
 
 const enc = (s: string) => new TextEncoder().encode(s);
-
-// 256 pronounceable words, frozen — index = byte value
-const WORDS: string[] = [];
-{
-  const ons = [
-    'b',
-    'd',
-    'f',
-    'g',
-    'h',
-    'j',
-    'k',
-    'l',
-    'm',
-    'n',
-    'p',
-    'r',
-    's',
-    't',
-    'v',
-    'z'
-  ];
-  const nuc = ['a', 'e', 'i', 'o'];
-  const cod = ['n', 'r', 'l', 'k'];
-  for (const o of ons)
-    for (const n of nuc) for (const c of cod) WORDS.push(o + n + c);
-}
 
 // §5 label normalization (frozen v1)
 export function normalize(raw: string): string {
@@ -88,7 +62,7 @@ async function digits(
 
 async function twoWords(key: CryptoKey, message: string): Promise<string> {
   const m = await mac(key, message);
-  return `${WORDS[m[0]]} ${WORDS[m[1]]}`;
+  return `${words.even[m[0]]} ${words.odd[m[1]]}`;
 }
 
 export const loginFingerprint = (key: CryptoKey): Promise<string> =>
