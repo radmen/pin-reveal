@@ -8,9 +8,7 @@ describe('App', (): void => {
     render(<App />);
 
     expect(
-      screen.getByRole('heading', {
-        name: /reveal what matters, one pin at a time/i
-      })
+      screen.getByRole('heading', { name: /derive your key/i })
     ).toBeInTheDocument();
   });
 });

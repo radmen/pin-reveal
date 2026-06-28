@@ -13,6 +13,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@noble/hashes": "^2.2.0",
     "@preact/preset-vite": "latest",
     "preact": "latest"
   },
