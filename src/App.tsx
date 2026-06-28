@@ -502,7 +502,13 @@ export function App(): JSX.Element {
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {/* ── LOGIN ── */}
             {s.phase === 'login' && (
-              <div
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (loginDisabled) return;
+                  if (loginClean) proceedLogin();
+                  else void generateLogin();
+                }}
                 style={{
                   height: '100%',
                   display: 'flex',
@@ -659,14 +665,7 @@ export function App(): JSX.Element {
                 </div>
 
                 <div style={{ marginTop: 'auto' }}>
-                  <button
-                    onClick={() => {
-                      if (loginDisabled) return;
-                      if (loginClean) proceedLogin();
-                      else void generateLogin();
-                    }}
-                    style={btnPrimary(loginDisabled)}
-                  >
+                  <button type="submit" style={btnPrimary(loginDisabled)}>
                     {s.deriving ? (
                       <span
                         style={{
@@ -696,12 +695,18 @@ export function App(): JSX.Element {
                     )}
                   </button>
                 </div>
-              </div>
+              </form>
             )}
 
             {/* ── LABEL / DERIVE ── */}
             {s.phase === 'label' && (
-              <div
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (labelDisabled) return;
+                  if (s.labelClean) proceedLabel();
+                  else void generateLabel();
+                }}
                 style={{
                   height: '100%',
                   display: 'flex',
@@ -786,6 +791,7 @@ export function App(): JSX.Element {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {([4, 6, 8] as const).map((n) => (
                         <button
+                          type="button"
                           key={n}
                           onClick={() =>
                             set({
@@ -802,6 +808,7 @@ export function App(): JSX.Element {
                         </button>
                       ))}
                       <button
+                        type="button"
                         onClick={() =>
                           set({
                             customMode: true,
@@ -930,6 +937,7 @@ export function App(): JSX.Element {
                 >
                   {s.labelClean && (
                     <button
+                      type="button"
                       onClick={() =>
                         set({ labelClean: false, labelFp: null, pin: null })
                       }
@@ -949,14 +957,7 @@ export function App(): JSX.Element {
                       Reset
                     </button>
                   )}
-                  <button
-                    onClick={() => {
-                      if (labelDisabled) return;
-                      if (s.labelClean) proceedLabel();
-                      else void generateLabel();
-                    }}
-                    style={btnPrimary(labelDisabled)}
-                  >
+                  <button type="submit" style={btnPrimary(labelDisabled)}>
                     {s.labelBusy
                       ? 'Generating…'
                       : s.labelClean
@@ -964,7 +965,7 @@ export function App(): JSX.Element {
                         : 'Generate PIN'}
                   </button>
                 </div>
-              </div>
+              </form>
             )}
 
             {/* ── REVEAL ── */}
