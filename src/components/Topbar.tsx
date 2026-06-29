@@ -73,30 +73,17 @@ export function Topbar({
               margin: '-8px'
             }}
           >
-            <span
-              style={{
-                width: '18px',
-                height: '1.5px',
-                background: 'var(--fg)',
-                display: 'block'
-              }}
-            />
-            <span
-              style={{
-                width: '18px',
-                height: '1.5px',
-                background: 'var(--fg)',
-                display: 'block'
-              }}
-            />
-            <span
-              style={{
-                width: '18px',
-                height: '1.5px',
-                background: 'var(--fg)',
-                display: 'block'
-              }}
-            />
+            {[0, 1, 2].map((index) => (
+              <span
+                key={index}
+                style={{
+                  width: '18px',
+                  height: '1.5px',
+                  background: 'var(--fg)',
+                  display: 'block'
+                }}
+              />
+            ))}
           </button>
         )}
       </div>
