@@ -66,7 +66,6 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   const disabled = isDeriving || (!isVerified && !(username && password));
 
   async function generate() {
-    if (!username || !password) return;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
     const worker = new Worker(new URL('../derive.worker.ts', import.meta.url), {
