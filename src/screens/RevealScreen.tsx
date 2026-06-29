@@ -56,25 +56,34 @@ export function RevealScreen({
 }: RevealScreenProps): JSX.Element {
   const segments = useMemo(() => {
     const result: string[] = [];
-    for (let i = 0; i < pin.length; i += 2) result.push(pin.slice(i, i + 2));
+
+    for (let i = 0; i < pin.length; i += 2) {
+      result.push(pin.slice(i, i + 2));
+    }
+
     return result;
   }, [pin]);
 
   const [cursor, setCursor] = useState(-1);
   const [visible, setVisible] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (timer.current) clearTimeout(timer.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
     };
   }, []);
 
   function flash(index: number) {
-    if (timer.current) clearTimeout(timer.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
     setCursor(index);
     setVisible(true);
-    timer.current = setTimeout(() => setVisible(false), revealTime);
+    timerRef.current = setTimeout(() => setVisible(false), revealTime);
   }
 
   const started = cursor >= 0;

@@ -57,6 +57,30 @@ const LIGHT: Record<string, string> = {
   '--shadow': '0 22px 60px rgba(0,0,0,.13)'
 };
 
+type Theme = 'dark' | 'light';
+
+function findStoredTheme(): Theme | null {
+  try {
+    const savedTheme = localStorage.getItem('pinderive.theme');
+
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      return savedTheme;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function storeThemePreference(theme: Theme): void {
+  try {
+    localStorage.setItem('pinderive.theme', theme);
+  } catch {
+    return;
+  }
+}
+
 function Splash(): JSX.Element {
   return (
     <div
@@ -87,7 +111,7 @@ export function App(): JSX.Element {
   const [key, setKey] = useState<CryptoKey | null | undefined>(
     typeof indexedDB === 'undefined' ? null : undefined
   );
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<Theme>('dark');
   const [revealTime, setRevealTime] = useState(250);
   const [menuOpen, setMenuOpen] = useState(false);
   const [labelResult, setLabelResult] = useState<{
@@ -96,10 +120,12 @@ export function App(): JSX.Element {
   } | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('pinderive.theme');
-      if (saved === 'dark' || saved === 'light') setTheme(saved);
-    } catch {}
+    const savedTheme = findStoredTheme();
+
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+
     loadKey()
       .then((loadedKey) => setKey(loadedKey ?? null))
       .catch(() => setKey(null));
@@ -118,11 +144,10 @@ export function App(): JSX.Element {
   }
 
   function toggleTheme() {
-    const next = theme === 'light' ? 'dark' : 'light';
-    try {
-      localStorage.setItem('pinderive.theme', next);
-    } catch {}
-    setTheme(next);
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+
+    storeThemePreference(nextTheme);
+    setTheme(nextTheme);
   }
 
   function screen(): JSX.Element {
