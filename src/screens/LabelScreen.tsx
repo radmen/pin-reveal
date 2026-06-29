@@ -97,7 +97,6 @@ export function LabelScreen({
   }
 
   async function generate() {
-    if (labelInvalid) return;
     const resolvedLength = customMode
       ? Math.max(3, Math.min(12, customLen || 0))
       : length;
