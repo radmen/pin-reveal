@@ -73,10 +73,8 @@ export function App(): JSX.Element {
   } | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('pinderive.theme');
-      if (saved === 'dark' || saved === 'light') setTheme(saved);
-    } catch {}
+    const saved = localStorage.getItem('pinderive.theme');
+    if (saved === 'dark' || saved === 'light') setTheme(saved);
     loadKey()
       .then((loadedKey) => setKey(loadedKey ?? null))
       .catch(() => setKey(null));
@@ -96,9 +94,7 @@ export function App(): JSX.Element {
 
   function toggleTheme() {
     const next = theme === 'light' ? 'dark' : 'light';
-    try {
-      localStorage.setItem('pinderive.theme', next);
-    } catch {}
+    localStorage.setItem('pinderive.theme', next);
     setTheme(next);
   }
 
