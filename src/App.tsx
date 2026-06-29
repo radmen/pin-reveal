@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { MenuDrawer } from './components/MenuDrawer';
+import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
 import { forgetKey, loadKey, storeKey } from './derive';
 import { LabelScreen } from './screens/LabelScreen';
@@ -56,30 +57,6 @@ const LIGHT: Record<string, string> = {
   '--scrim': 'rgba(0,0,0,.32)',
   '--shadow': '0 22px 60px rgba(0,0,0,.13)'
 };
-
-function Splash(): JSX.Element {
-  return (
-    <div
-      style={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "'Space Mono',monospace",
-          fontSize: '14px',
-          letterSpacing: '1px',
-          color: 'var(--faint)'
-        }}
-      >
-        pin<span>·</span>derive
-      </span>
-    </div>
-  );
-}
 
 export function App(): JSX.Element {
   // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
