@@ -73,6 +73,18 @@ const skel = (width: string, height: string): JSX.CSSProperties => ({
   animation: 'shimmer 1.3s linear infinite'
 });
 
+async function deriveLabelResult(
+  masterKey: CryptoKey,
+  label: string,
+  length: number
+): Promise<{ pin: string; fingerprint: string }> {
+  const [fingerprint, pin] = await Promise.all([
+    labelFingerprint(masterKey, label),
+    derivePin(masterKey, label, length)
+  ]);
+  return { pin, fingerprint };
+}
+
 export function LabelScreen({
   masterKey,
   onProceed
@@ -102,10 +114,11 @@ export function LabelScreen({
       : length;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const [fingerprint, pin] = await Promise.all([
-      labelFingerprint(masterKey, label),
-      derivePin(masterKey, label, resolvedLength)
-    ]);
+    const { pin, fingerprint } = await deriveLabelResult(
+      masterKey,
+      label,
+      resolvedLength
+    );
     dispatch({ type: 'complete', runId, pin, fingerprint });
   }
 

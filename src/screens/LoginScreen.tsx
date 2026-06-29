@@ -56,6 +56,26 @@ const skel = (width: string, height: string): JSX.CSSProperties => ({
   animation: 'shimmer 1.3s linear infinite'
 });
 
+function deriveKeyFromWorker(
+  username: string,
+  password: string
+): Promise<CryptoKey> {
+  return new Promise<CryptoKey>((resolve, reject) => {
+    const worker = new Worker(new URL('../derive.worker.ts', import.meta.url), {
+      type: 'module'
+    });
+    worker.onmessage = (event: MessageEvent<CryptoKey>) => {
+      worker.terminate();
+      resolve(event.data);
+    };
+    worker.onerror = (event: ErrorEvent) => {
+      worker.terminate();
+      reject(event.error);
+    };
+    worker.postMessage({ password, username });
+  });
+}
+
 export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   const [state, dispatch] = useReducer(loginReducer, { kind: 'idle' });
   const [username, setUsername] = useState('');
@@ -69,15 +89,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
     if (!username || !password) return;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const worker = new Worker(new URL('../derive.worker.ts', import.meta.url), {
-      type: 'module'
-    });
-    worker.postMessage({ password, username });
-    const derivedKey = await new Promise<CryptoKey>((resolve) => {
-      worker.onmessage = (event: MessageEvent<CryptoKey>) =>
-        resolve(event.data);
-    });
-    worker.terminate();
+    const derivedKey = await deriveKeyFromWorker(username, password);
     const fingerprint = await loginFingerprint(derivedKey);
     dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
   }
