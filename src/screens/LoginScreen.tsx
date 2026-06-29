@@ -56,7 +56,7 @@ const skel = (width: string, height: string): JSX.CSSProperties => ({
   animation: 'shimmer 1.3s linear infinite'
 });
 
-function deriveKeyFromWorker(
+function getKeyFromWorker(
   username: string,
   password: string
 ): Promise<CryptoKey> {
@@ -89,7 +89,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
     if (!username || !password) return;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const derivedKey = await deriveKeyFromWorker(username, password);
+    const derivedKey = await getKeyFromWorker(username, password);
     const fingerprint = await loginFingerprint(derivedKey);
     dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
   }

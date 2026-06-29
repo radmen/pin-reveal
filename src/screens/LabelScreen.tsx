@@ -73,7 +73,7 @@ const skel = (width: string, height: string): JSX.CSSProperties => ({
   animation: 'shimmer 1.3s linear infinite'
 });
 
-async function deriveLabelResult(
+async function getLabelResult(
   masterKey: CryptoKey,
   label: string,
   length: number
@@ -114,7 +114,7 @@ export function LabelScreen({
       : length;
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const { pin, fingerprint } = await deriveLabelResult(
+    const { pin, fingerprint } = await getLabelResult(
       masterKey,
       label,
       resolvedLength
