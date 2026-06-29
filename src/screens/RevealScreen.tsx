@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { btnPrimary, capLabel } from '../components/styles';
+import { CapLabel } from '../components/CapLabel';
+import { PrimaryButton } from '../components/PrimaryButton';
 import { normalize } from '../derive';
 
 interface RevealScreenProps {
@@ -148,7 +149,7 @@ export function RevealScreen({
             gap: '16px'
           }}
         >
-          <span style={capLabel}>Step 03 · Reveal</span>
+          <CapLabel>Step 03 · Reveal</CapLabel>
           <div
             style={{
               display: 'flex',
@@ -202,15 +203,11 @@ export function RevealScreen({
           </button>
         )}
         {!isLast && (
-          <button onClick={() => flash(cursor + 1)} style={btnPrimary(false)}>
+          <PrimaryButton onClick={() => flash(cursor + 1)}>
             {started ? 'Next →' : 'Reveal segment →'}
-          </button>
+          </PrimaryButton>
         )}
-        {isLast && (
-          <button onClick={onExit} style={btnPrimary(false)}>
-            Done
-          </button>
-        )}
+        {isLast && <PrimaryButton onClick={onExit}>Done</PrimaryButton>}
       </div>
     </div>
   );

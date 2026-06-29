@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
-import { btnPrimary, capLabel } from '../components/styles';
+import { CapLabel } from '../components/CapLabel';
+import { PrimaryButton } from '../components/PrimaryButton';
 import { derivePin, labelFingerprint, normalize } from '../derive';
 
 type LabelState =
@@ -126,7 +127,7 @@ export function LabelScreen({
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-        <span style={capLabel}>Step 02 · Derive a PIN</span>
+        <CapLabel>Step 02 · Derive a PIN</CapLabel>
         <h1
           style={{
             fontSize: '29px',
@@ -149,7 +150,7 @@ export function LabelScreen({
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-          <label style={capLabel}>Label</label>
+          <CapLabel>Label</CapLabel>
           <input
             value={label}
             onInput={(event) => {
@@ -175,7 +176,7 @@ export function LabelScreen({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-          <label style={capLabel}>PIN length</label>
+          <CapLabel>PIN length</CapLabel>
           <div style={{ display: 'flex', gap: '8px' }}>
             {([4, 6, 8] as const).map((digits) => (
               <button
@@ -257,7 +258,7 @@ export function LabelScreen({
           gap: '11px'
         }}
       >
-        <span style={capLabel}>Label fingerprint</span>
+        <CapLabel>Label fingerprint</CapLabel>
         {isBusy && (
           <div style={{ display: 'flex', gap: '11px' }}>
             <div style={skel('108px', '30px')} />
@@ -330,9 +331,9 @@ export function LabelScreen({
             Reset
           </button>
         )}
-        <button type="submit" style={btnPrimary(disabled)}>
+        <PrimaryButton type="submit" disabled={disabled}>
           {isBusy ? 'Generating…' : isVerified ? 'Proceed →' : 'Generate PIN'}
-        </button>
+        </PrimaryButton>
       </div>
     </form>
   );

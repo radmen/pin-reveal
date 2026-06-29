@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { capLabel } from './styles';
+import { CapLabel } from './CapLabel';
 
 interface MenuDrawerProps {
   revealTime: number;
@@ -97,7 +97,7 @@ export function MenuDrawer({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
-          <span style={capLabel}>Reveal time</span>
+          <CapLabel>Reveal time</CapLabel>
           <div style={{ display: 'flex', gap: '7px' }}>
             {([150, 250, 500, 1000] as const).map((milliseconds) => (
               <button

@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
-import { btnPrimary, capLabel } from '../components/styles';
+import { CapLabel } from '../components/CapLabel';
+import { PrimaryButton } from '../components/PrimaryButton';
 import { loginFingerprint } from '../derive';
 
 type LoginState =
@@ -105,7 +106,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-        <span style={capLabel}>Step 01 · Credentials</span>
+        <CapLabel>Step 01 · Credentials</CapLabel>
         <h1
           style={{
             fontSize: '29px',
@@ -140,7 +141,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-          <label style={capLabel}>Username</label>
+          <CapLabel>Username</CapLabel>
           <input
             value={username}
             onInput={(event) => {
@@ -154,7 +155,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-          <label style={capLabel}>Password</label>
+          <CapLabel>Password</CapLabel>
           <input
             type="password"
             value={password}
@@ -178,7 +179,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           gap: '11px'
         }}
       >
-        <span style={capLabel}>Login fingerprint</span>
+        <CapLabel>Login fingerprint</CapLabel>
         {isDeriving && (
           <div style={{ display: 'flex', gap: '11px' }}>
             <div style={skel('120px', '32px')} />
@@ -224,7 +225,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
       </div>
 
       <div style={{ marginTop: 'auto' }}>
-        <button type="submit" style={btnPrimary(disabled)}>
+        <PrimaryButton type="submit" disabled={disabled}>
           {isDeriving ? (
             <span
               style={{
@@ -252,7 +253,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           ) : (
             'Generate fingerprint'
           )}
-        </button>
+        </PrimaryButton>
       </div>
     </form>
   );
