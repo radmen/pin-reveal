@@ -2,7 +2,8 @@ import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { loginFingerprint } from '../derive';
+import { deriveKey } from '../derive-key-worker';
+import { calculateLoginFingerprint } from '../derivation-contract';
 
 type LoginState =
   | { kind: 'idle' }
@@ -57,26 +58,6 @@ const skel = (width: string, height: string): JSX.CSSProperties => ({
   animation: 'shimmer 1.3s linear infinite'
 });
 
-function getKeyFromWorker(
-  username: string,
-  password: string
-): Promise<CryptoKey> {
-  return new Promise<CryptoKey>((resolve, reject) => {
-    const worker = new Worker(new URL('../derive.worker.ts', import.meta.url), {
-      type: 'module'
-    });
-    worker.onmessage = (event: MessageEvent<CryptoKey>) => {
-      worker.terminate();
-      resolve(event.data);
-    };
-    worker.onerror = (event: ErrorEvent) => {
-      worker.terminate();
-      reject(event.error);
-    };
-    worker.postMessage({ password, username });
-  });
-}
-
 export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   const [state, dispatch] = useReducer(loginReducer, { kind: 'idle' });
   const [username, setUsername] = useState('');
@@ -89,8 +70,8 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   async function generate() {
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const derivedKey = await getKeyFromWorker(username, password);
-    const fingerprint = await loginFingerprint(derivedKey);
+    const derivedKey = await deriveKey(password, username);
+    const fingerprint = await calculateLoginFingerprint(derivedKey);
     dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
   }
 

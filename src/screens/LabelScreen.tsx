@@ -2,7 +2,11 @@ import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { derivePin, labelFingerprint, normalize } from '../derive';
+import {
+  calculateLabelFingerprint,
+  derivePin,
+  normalizeLabel
+} from '../derivation-contract';
 
 type LabelState =
   | { kind: 'idle' }
@@ -80,7 +84,7 @@ async function getLabelResult(
   length: number
 ): Promise<{ pin: string; fingerprint: string }> {
   const [fingerprint, pin] = await Promise.all([
-    labelFingerprint(masterKey, label),
+    calculateLabelFingerprint(masterKey, label),
     derivePin(masterKey, label, length)
   ]);
   return { pin, fingerprint };
@@ -174,7 +178,7 @@ export function LabelScreen({
             spellcheck={false}
             style={fieldStyle}
           />
-          {normalize(label) && (
+          {normalizeLabel(label) && (
             <span
               style={{
                 fontFamily: "'Space Mono',monospace",
@@ -182,7 +186,7 @@ export function LabelScreen({
                 color: 'var(--faint)'
               }}
             >
-              → {normalize(label)}
+              → {normalizeLabel(label)}
             </span>
           )}
         </div>
