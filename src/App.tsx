@@ -3,7 +3,13 @@ import { useEffect, useState } from 'preact/hooks';
 import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
-import { findStoredKey, forgetKey, storeKey } from './key-store';
+import {
+  ForgetKeyError,
+  forgetMasterKey,
+  loadMasterKey,
+  StoreKeyError,
+  storeMasterKey
+} from './key-persistence';
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
@@ -82,6 +88,22 @@ function storeThemePreference(theme: Theme): void {
   }
 }
 
+function ignoreStoreKeyError(error: unknown): void {
+  if (error instanceof StoreKeyError) {
+    return;
+  }
+
+  throw error;
+}
+
+function ignoreForgetKeyError(error: unknown): void {
+  if (error instanceof ForgetKeyError) {
+    return;
+  }
+
+  throw error;
+}
+
 export function App(): JSX.Element {
   // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
   // jsdom has no indexedDB, so skip Splash in tests by initialising to null.
@@ -103,24 +125,26 @@ export function App(): JSX.Element {
       setTheme(savedTheme);
     }
 
-    findStoredKey()
-      .then((loadedKey) => setKey(loadedKey ?? null))
-      .catch(() => setKey(null));
+    if (typeof indexedDB === 'undefined') {
+      return;
+    }
+
+    void loadMasterKey().then((loadedKey) => setKey(loadedKey ?? null));
   }, []);
 
-  function handleLoginConfirm(confirmedKey: CryptoKey) {
+  function handleLoginConfirm(confirmedKey: CryptoKey): void {
     setKey(confirmedKey);
-    storeKey(confirmedKey).catch(() => {});
+    storeMasterKey(confirmedKey).catch(ignoreStoreKeyError);
   }
 
-  function handleLogout() {
+  function handleLogout(): void {
     setKey(null);
     setLabelResult(null);
     setMenuOpen(false);
-    forgetKey().catch(() => {});
+    forgetMasterKey().catch(ignoreForgetKeyError);
   }
 
-  function toggleTheme() {
+  function toggleTheme(): void {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
 
     storeThemePreference(nextTheme);
@@ -128,8 +152,14 @@ export function App(): JSX.Element {
   }
 
   function screen(): JSX.Element {
-    if (key === undefined) return <Splash />;
-    if (key === null) return <LoginScreen onConfirm={handleLoginConfirm} />;
+    if (key === undefined) {
+      return <Splash />;
+    }
+
+    if (key === null) {
+      return <LoginScreen onConfirm={handleLoginConfirm} />;
+    }
+
     if (!labelResult) {
       return (
         <LabelScreen
