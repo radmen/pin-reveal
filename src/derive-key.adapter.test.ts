@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import * as workerAdapter from './derive-key-worker';
+import * as keyDerivationAdapter from './derive-key.adapter';
 
 type PostedMessage = {
   password: string;
@@ -44,16 +44,16 @@ afterEach((): void => {
   globalThis.Worker = originalWorker;
 });
 
-describe('derive key worker adapter', (): void => {
+describe('derive key adapter', (): void => {
   it('exports only the key derivation operation', (): void => {
-    expect(Object.keys(workerAdapter)).toEqual(['deriveKey']);
+    expect(Object.keys(keyDerivationAdapter)).toEqual(['deriveKey']);
   });
 
   it('posts derivation inputs and terminates on success', async (): Promise<void> => {
     installFakeWorker();
 
     const key = {} as CryptoKey;
-    const promise = workerAdapter.deriveKey('password', 'username');
+    const promise = keyDerivationAdapter.deriveKey('password', 'username');
     const worker = FakeWorker.instances[0];
 
     expect(worker.options).toEqual({ type: 'module' });
@@ -72,7 +72,7 @@ describe('derive key worker adapter', (): void => {
     installFakeWorker();
 
     const error = new Error('boom');
-    const promise = workerAdapter.deriveKey('password', 'username');
+    const promise = keyDerivationAdapter.deriveKey('password', 'username');
     const worker = FakeWorker.instances[0];
 
     worker.onerror?.({ error } as ErrorEvent);

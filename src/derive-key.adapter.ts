@@ -16,9 +16,12 @@ export function deriveKey(
   username: string
 ): Promise<CryptoKey> {
   return new Promise<CryptoKey>((resolve, reject) => {
-    const worker = new Worker(new URL('./derive.worker.ts', import.meta.url), {
-      type: 'module'
-    });
+    const worker = new Worker(
+      new URL('./derive-key.worker.ts', import.meta.url),
+      {
+        type: 'module'
+      }
+    );
 
     worker.onmessage = (event: MessageEvent<CryptoKey>) => {
       worker.terminate();

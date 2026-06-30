@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { deriveKey } from '../derive-key-worker';
+import { deriveKey } from '../derive-key.adapter';
 import { calculateLoginFingerprint } from '../derivation-contract';
 
 type LoginState =
