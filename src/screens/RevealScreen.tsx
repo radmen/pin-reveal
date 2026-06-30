@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { normalize } from '../derive';
+import { normalizeLabel } from '../derivation-contract';
 
 interface RevealScreenProps {
   pin: string;
@@ -89,7 +89,7 @@ export function RevealScreen({
 
   const started = cursor >= 0;
   const isLast = cursor >= segments.length - 1;
-  const normalizedLabel = normalize(label);
+  const normalizedLabel = normalizeLabel(label);
   const caption = started
     ? `Segment ${cursor + 1} / ${segments.length} · shown ${revealTime}ms`
     : `Press Reveal to show segment 1 / ${segments.length}`;
