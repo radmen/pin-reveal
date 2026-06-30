@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IDBFactory } from 'fake-indexeddb';
 import {
   ForgetKeyError,
   forgetMasterKey,
@@ -11,32 +12,11 @@ import {
 const originalIndexedDB = globalThis.indexedDB;
 const textEncoder = new TextEncoder();
 
-type StoredRecords = Map<string, unknown>;
-
 type MockRequest<T> = {
   error: unknown;
   result: T | undefined;
   onerror: (() => void) | null;
   onsuccess: (() => void) | null;
-  onupgradeneeded?: (() => void) | null;
-};
-
-type MockTransaction = {
-  error: unknown;
-  oncomplete: (() => void) | null;
-  onerror: (() => void) | null;
-  objectStore: (name: string) => MockObjectStore;
-};
-
-type MockObjectStore = {
-  delete: (key: string) => MockRequest<undefined>;
-  get: (key: string) => MockRequest<unknown>;
-  put: (value: unknown, key: string) => MockRequest<undefined>;
-};
-
-type MockDatabase = {
-  createObjectStore: (name: string) => MockObjectStore;
-  transaction: (name: string) => MockTransaction;
 };
 
 function createRequest<T>(): MockRequest<T> {
@@ -44,104 +24,14 @@ function createRequest<T>(): MockRequest<T> {
     error: null,
     result: undefined,
     onerror: null,
-    onsuccess: null,
-    onupgradeneeded: null
+    onsuccess: null
   };
-}
-
-function createObjectStore(records: StoredRecords): MockObjectStore {
-  return {
-    delete: (key: string): MockRequest<undefined> => {
-      const request = createRequest<undefined>();
-
-      records.delete(key);
-
-      return request;
-    },
-    get: (key: string): MockRequest<unknown> => {
-      const request = createRequest<unknown>();
-
-      queueMicrotask((): void => {
-        request.result = records.get(key);
-        request.onsuccess?.();
-      });
-
-      return request;
-    },
-    put: (value: unknown, key: string): MockRequest<undefined> => {
-      const request = createRequest<undefined>();
-
-      records.set(key, value);
-
-      return request;
-    }
-  };
-}
-
-function createDatabase(stores: Map<string, StoredRecords>): MockDatabase {
-  return {
-    createObjectStore: (name: string): MockObjectStore => {
-      const records = new Map<string, unknown>();
-
-      stores.set(name, records);
-
-      return createObjectStore(records);
-    },
-    transaction: (name: string): MockTransaction => {
-      const records = stores.get(name);
-
-      if (!records) {
-        throw new Error(`Missing object store: ${name}`);
-      }
-
-      const transaction: MockTransaction = {
-        error: null,
-        oncomplete: null,
-        onerror: null,
-        objectStore: (): MockObjectStore => createObjectStore(records)
-      };
-
-      queueMicrotask((): void => {
-        transaction.oncomplete?.();
-      });
-
-      return transaction;
-    }
-  };
-}
-
-function createMemoryIndexedDB(): IDBFactory {
-  const databases = new Map<string, MockDatabase>();
-
-  return {
-    open: (name: string): IDBOpenDBRequest => {
-      const request = createRequest<MockDatabase>();
-
-      queueMicrotask((): void => {
-        let database = databases.get(name);
-
-        if (!database) {
-          const stores = new Map<string, StoredRecords>();
-
-          database = createDatabase(stores);
-          databases.set(name, database);
-          request.result = database;
-          request.onupgradeneeded?.();
-        }
-
-        request.result = database;
-        request.onsuccess?.();
-      });
-
-      return request as unknown as IDBOpenDBRequest;
-    }
-  } as IDBFactory;
 }
 
 function installEmptyIndexedDB(): void {
   Object.defineProperty(globalThis, 'indexedDB', {
     configurable: true,
-    value: createMemoryIndexedDB(),
+    value: new IDBFactory(),
     writable: true
   });
 }
@@ -158,38 +48,23 @@ function installFailingIndexedDB(cause: unknown): void {
   });
 }
 
-function createFailingLoadRequestObjectStore(
-  cause: unknown,
-  getRequest: MockRequest<unknown>
-): MockObjectStore {
-  return {
-    delete: (): MockRequest<undefined> => createRequest<undefined>(),
-    get: (): MockRequest<unknown> => {
-      queueMicrotask((): void => {
-        getRequest.error = cause;
-        getRequest.onerror?.();
-      });
-
-      return getRequest;
-    },
-    put: (): MockRequest<undefined> => createRequest<undefined>()
-  };
-}
-
-function createFailingLoadRequestDatabase(cause: unknown): MockDatabase {
+function createFailingLoadRequestDatabase(cause: unknown): IDBDatabase {
   const getRequest = createRequest<unknown>();
 
   return {
-    createObjectStore: (name: string): MockObjectStore =>
-      createObjectStore(new Map([[name, undefined]])),
-    transaction: (): MockTransaction => ({
-      error: null,
-      oncomplete: null,
-      onerror: null,
-      objectStore: (): MockObjectStore =>
-        createFailingLoadRequestObjectStore(cause, getRequest)
+    transaction: () => ({
+      objectStore: () => ({
+        get: (): MockRequest<unknown> => {
+          queueMicrotask((): void => {
+            getRequest.error = cause;
+            getRequest.onerror?.();
+          });
+
+          return getRequest;
+        }
+      })
     })
-  };
+  } as unknown as IDBDatabase;
 }
 
 function installFailingLoadRequestIndexedDB(cause: unknown): void {
@@ -197,7 +72,7 @@ function installFailingLoadRequestIndexedDB(cause: unknown): void {
     configurable: true,
     value: {
       open: (): IDBOpenDBRequest => {
-        const openRequest = createRequest<MockDatabase>();
+        const openRequest = createRequest<IDBDatabase>();
         const database = createFailingLoadRequestDatabase(cause);
 
         queueMicrotask((): void => {
