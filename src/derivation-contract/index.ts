@@ -8,7 +8,7 @@ function encode(value: string): Uint8Array<ArrayBuffer> {
 }
 
 export function normalizeLabel(rawLabel: string): string {
-  let normalizedLabel = (rawLabel || '').normalize('NFC').toLowerCase();
+  let normalizedLabel = rawLabel.normalize('NFC').toLowerCase();
   normalizedLabel = normalizedLabel
     .replace(/ł/g, 'l')
     .replace(/ø/g, 'o')
@@ -56,8 +56,8 @@ async function calculateDigits(
 ): Promise<number[]> {
   const output: number[] = [];
 
-  for (let n = 0; output.length < count; n++) {
-    const message = n === 0 ? baseMessage : `${baseMessage}|${n}`;
+  for (let counter = 0; output.length < count; counter++) {
+    const message = counter === 0 ? baseMessage : `${baseMessage}|${counter}`;
     const mac = await calculateMac(key, message);
 
     for (const byte of mac) {

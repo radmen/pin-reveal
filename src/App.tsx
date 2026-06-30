@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
-import { forgetKey, loadKey, storeKey } from './key-store';
+import { findStoredKey, forgetKey, storeKey } from './key-store';
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
@@ -103,7 +103,7 @@ export function App(): JSX.Element {
       setTheme(savedTheme);
     }
 
-    loadKey()
+    findStoredKey()
       .then((loadedKey) => setKey(loadedKey ?? null))
       .catch(() => setKey(null));
   }, []);

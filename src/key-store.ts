@@ -1,10 +1,10 @@
-const DB_NAME = 'pinapp';
+const DATABASE_NAME = 'pinapp';
 const STORE_NAME = 'keys';
 const KEY_ID = 'master';
 
-function openDb(): Promise<IDBDatabase> {
+function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DATABASE_NAME, 1);
     request.onupgradeneeded = () =>
       request.result.createObjectStore(STORE_NAME);
     request.onsuccess = () => resolve(request.result);
@@ -13,19 +13,19 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 export async function storeKey(key: CryptoKey): Promise<void> {
-  const db = await openDb();
+  const database = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const transaction = database.transaction(STORE_NAME, 'readwrite');
     transaction.objectStore(STORE_NAME).put(key, KEY_ID);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });
 }
 
-export async function loadKey(): Promise<CryptoKey | null> {
-  const db = await openDb();
+export async function findStoredKey(): Promise<CryptoKey | null> {
+  const database = await openDatabase();
   return new Promise((resolve, reject) => {
-    const request = db
+    const request = database
       .transaction(STORE_NAME, 'readonly')
       .objectStore(STORE_NAME)
       .get(KEY_ID);
@@ -35,9 +35,9 @@ export async function loadKey(): Promise<CryptoKey | null> {
 }
 
 export async function forgetKey(): Promise<void> {
-  const db = await openDb();
+  const database = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const transaction = database.transaction(STORE_NAME, 'readwrite');
     transaction.objectStore(STORE_NAME).delete(KEY_ID);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
