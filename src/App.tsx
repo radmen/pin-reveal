@@ -1,5 +1,9 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import {
+  KeyPersistenceWarningBanner,
+  type KeyPersistenceError
+} from './components/KeyPersistenceWarningBanner';
 import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
@@ -67,12 +71,6 @@ const LIGHT: Record<string, string> = {
 
 type Theme = 'dark' | 'light';
 
-type KeyPersistenceWarning = {
-  userMessage: string;
-  message: string;
-  causeMessage: string | null;
-};
-
 function findStoredTheme(): Theme | null {
   try {
     const savedTheme = localStorage.getItem('pinderive.theme');
@@ -95,113 +93,6 @@ function storeThemePreference(theme: Theme): void {
   }
 }
 
-function findCauseMessage(error: Error): string | null {
-  if (!error.cause) {
-    return null;
-  }
-
-  if (error.cause instanceof Error) {
-    return error.cause.message;
-  }
-
-  return String(error.cause);
-}
-
-function getKeyPersistenceWarning(
-  error: LoadKeyError | StoreKeyError | ForgetKeyError
-): KeyPersistenceWarning {
-  if (error instanceof LoadKeyError) {
-    return {
-      userMessage: 'Your saved key could not be loaded.',
-      message: error.message,
-      causeMessage: findCauseMessage(error)
-    };
-  }
-
-  if (error instanceof StoreKeyError) {
-    return {
-      userMessage: 'Your key could not be saved for next time.',
-      message: error.message,
-      causeMessage: findCauseMessage(error)
-    };
-  }
-
-  return {
-    userMessage: 'Your saved key could not be forgotten.',
-    message: error.message,
-    causeMessage: findCauseMessage(error)
-  };
-}
-
-function KeyPersistenceWarningBanner({
-  warning,
-  onDismiss
-}: {
-  warning: KeyPersistenceWarning;
-  onDismiss(): void;
-}): JSX.Element {
-  return (
-    <div
-      role="alert"
-      style={{
-        margin: '14px 18px 0',
-        padding: '13px 14px',
-        border: '1px solid #f59e0b',
-        borderRadius: '13px',
-        background: 'rgba(245, 158, 11, .12)',
-        color: 'var(--fg)',
-        fontSize: '12.5px',
-        lineHeight: '1.45'
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-          justifyContent: 'space-between'
-        }}
-      >
-        <div>
-          <strong style={{ display: 'block', marginBottom: '4px' }}>
-            {warning.userMessage}
-          </strong>
-          You can still derive your key and continue using the app.
-        </div>
-        <button
-          aria-label="Dismiss warning"
-          onClick={onDismiss}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--muted)',
-            cursor: 'pointer',
-            fontSize: '16px',
-            padding: 0
-          }}
-        >
-          x
-        </button>
-      </div>
-      <details style={{ marginTop: '9px' }}>
-        <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>
-          Technical details
-        </summary>
-        <div
-          style={{
-            marginTop: '8px',
-            fontFamily: "'Space Mono',monospace",
-            color: 'var(--muted)'
-          }}
-        >
-          <div>{warning.message}</div>
-          {warning.causeMessage && <div>{warning.causeMessage}</div>}
-        </div>
-      </details>
-    </div>
-  );
-}
-
 export function App(): JSX.Element {
   // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
   // jsdom has no indexedDB, so skip Splash in tests by initialising to null.
@@ -211,8 +102,8 @@ export function App(): JSX.Element {
   const [theme, setTheme] = useState<Theme>('dark');
   const [revealTime, setRevealTime] = useState(250);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [keyPersistenceWarning, setKeyPersistenceWarning] =
-    useState<KeyPersistenceWarning | null>(null);
+  const [keyPersistenceError, setKeyPersistenceError] =
+    useState<KeyPersistenceError | null>(null);
   const [labelResult, setLabelResult] = useState<{
     pin: string;
     label: string;
@@ -233,7 +124,7 @@ export function App(): JSX.Element {
       .then((loadedKey) => setKey(loadedKey ?? null))
       .catch((error: unknown) => {
         if (error instanceof LoadKeyError) {
-          setKeyPersistenceWarning(getKeyPersistenceWarning(error));
+          setKeyPersistenceError(error);
           setKey(null);
           return;
         }
@@ -246,7 +137,7 @@ export function App(): JSX.Element {
     setKey(confirmedKey);
     storeMasterKey(confirmedKey).catch((error: unknown) => {
       if (error instanceof StoreKeyError) {
-        setKeyPersistenceWarning(getKeyPersistenceWarning(error));
+        setKeyPersistenceError(error);
         return;
       }
 
@@ -259,10 +150,10 @@ export function App(): JSX.Element {
     setLabelResult(null);
     setMenuOpen(false);
     forgetMasterKey()
-      .then(() => setKeyPersistenceWarning(null))
+      .then(() => setKeyPersistenceError(null))
       .catch((error: unknown) => {
         if (error instanceof ForgetKeyError) {
-          setKeyPersistenceWarning(getKeyPersistenceWarning(error));
+          setKeyPersistenceError(error);
           return;
         }
 
@@ -352,12 +243,10 @@ export function App(): JSX.Element {
             showMenu={!!key}
             onOpenMenu={() => setMenuOpen(true)}
           />
-          {keyPersistenceWarning && (
-            <KeyPersistenceWarningBanner
-              warning={keyPersistenceWarning}
-              onDismiss={() => setKeyPersistenceWarning(null)}
-            />
-          )}
+          <KeyPersistenceWarningBanner
+            error={keyPersistenceError}
+            onDismiss={() => setKeyPersistenceError(null)}
+          />
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {screen()}
           </div>
