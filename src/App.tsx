@@ -95,7 +95,7 @@ function storeThemePreference(theme: Theme): void {
   }
 }
 
-function getCauseMessage(error: Error): string | null {
+function findCauseMessage(error: Error): string | null {
   if (!error.cause) {
     return null;
   }
@@ -114,7 +114,7 @@ function getKeyPersistenceWarning(
     return {
       userMessage: 'Your saved key could not be loaded.',
       message: error.message,
-      causeMessage: getCauseMessage(error)
+      causeMessage: findCauseMessage(error)
     };
   }
 
@@ -122,14 +122,14 @@ function getKeyPersistenceWarning(
     return {
       userMessage: 'Your key could not be saved for next time.',
       message: error.message,
-      causeMessage: getCauseMessage(error)
+      causeMessage: findCauseMessage(error)
     };
   }
 
   return {
     userMessage: 'Your saved key could not be forgotten.',
     message: error.message,
-    causeMessage: getCauseMessage(error)
+    causeMessage: findCauseMessage(error)
   };
 }
 
@@ -202,22 +202,6 @@ function KeyPersistenceWarningBanner({
   );
 }
 
-function ignoreStoreKeyError(error: unknown): void {
-  if (error instanceof StoreKeyError) {
-    return;
-  }
-
-  throw error;
-}
-
-function ignoreForgetKeyError(error: unknown): void {
-  if (error instanceof ForgetKeyError) {
-    return;
-  }
-
-  throw error;
-}
-
 export function App(): JSX.Element {
   // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
   // jsdom has no indexedDB, so skip Splash in tests by initialising to null.
@@ -266,7 +250,7 @@ export function App(): JSX.Element {
         return;
       }
 
-      ignoreStoreKeyError(error);
+      throw error;
     });
   }
 
@@ -282,7 +266,7 @@ export function App(): JSX.Element {
           return;
         }
 
-        ignoreForgetKeyError(error);
+        throw error;
       });
   }
 
