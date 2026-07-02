@@ -150,6 +150,52 @@ describe('App', (): void => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('recovers locally from a worker derivation failure and allows retry', async (): Promise<void> => {
+    const retryKey = await createKey();
+    mockedDeriveKey
+      .mockRejectedValueOnce(new Error('worker stack trace: raw failure'))
+      .mockResolvedValueOnce(retryKey);
+
+    render(<App />);
+
+    const usernameInput = await screen.findByPlaceholderText(/identity/i);
+    const passwordInput = screen.getByPlaceholderText(/passphrase/i);
+    fireEvent.input(usernameInput, {
+      target: { value: 'user@example.com' }
+    });
+    fireEvent.input(passwordInput, {
+      target: { value: 'correct horse battery staple' }
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /generate fingerprint/i })
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /we could not derive your key/i
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/worker stack/i);
+    expect(screen.getByPlaceholderText(/identity/i)).toHaveValue(
+      'user@example.com'
+    );
+    expect(screen.getByPlaceholderText(/passphrase/i)).toHaveValue(
+      'correct horse battery staple'
+    );
+    expect(
+      screen.getByRole('button', { name: /generate fingerprint/i })
+    ).toBeEnabled();
+    expect(mockedStoreMasterKey).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /generate fingerprint/i })
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /proceed/i })
+    ).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mockedDeriveKey).toHaveBeenCalledTimes(2);
+  });
+
   it('waits for persistence before entering a persisted session', async (): Promise<void> => {
     const storeMasterKeyDeferred = createDeferred<void>();
     mockedStoreMasterKey.mockReturnValue(storeMasterKeyDeferred.promise);

@@ -6,14 +6,18 @@ import { deriveKey } from '../derive-key.adapter';
 import { calculateLoginFingerprint } from '../derivation-contract';
 
 type LoginState =
-  | { kind: 'idle' }
+  | { kind: 'idle'; derivationError?: string }
   | { kind: 'deriving'; runId: symbol }
   | { kind: 'verified'; key: CryptoKey; fingerprint: string };
 
 type LoginAction =
   | { type: 'start'; runId: symbol }
   | { type: 'complete'; runId: symbol; key: CryptoKey; fingerprint: string }
+  | { type: 'fail'; runId: symbol }
   | { type: 'reset' };
+
+const genericDerivationError =
+  'We could not derive your key. Check your credentials and try again.';
 
 function loginReducer(state: LoginState, action: LoginAction): LoginState {
   switch (action.type) {
@@ -28,6 +32,11 @@ function loginReducer(state: LoginState, action: LoginAction): LoginState {
         key: action.key,
         fingerprint: action.fingerprint
       };
+    case 'fail':
+      if (state.kind !== 'deriving' || state.runId !== action.runId) {
+        return state;
+      }
+      return { kind: 'idle', derivationError: genericDerivationError };
     case 'reset':
       return { kind: 'idle' };
   }
@@ -72,7 +81,15 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   async function generate(): Promise<void> {
     const runId = Symbol();
     dispatch({ type: 'start', runId });
-    const derivedKey = await deriveKey(password, username);
+    let derivedKey: CryptoKey;
+
+    try {
+      derivedKey = await deriveKey(password, username);
+    } catch {
+      dispatch({ type: 'fail', runId });
+      return;
+    }
+
     const fingerprint = await calculateLoginFingerprint(derivedKey);
     dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
   }
@@ -220,16 +237,34 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           </div>
         )}
         {state.kind === 'idle' && (
-          <div
-            style={{
-              fontFamily: "'Space Mono',monospace",
-              fontSize: '26px',
-              color: 'var(--hint)',
-              letterSpacing: '5px'
-            }}
-          >
-            •••• ••••
-          </div>
+          <>
+            {state.derivationError && (
+              <div
+                role="alert"
+                style={{
+                  border: '1px solid var(--border2)',
+                  borderRadius: '11px',
+                  padding: '12px 13px',
+                  color: 'var(--fg)',
+                  background: 'var(--field)',
+                  fontSize: '13px',
+                  lineHeight: '1.45'
+                }}
+              >
+                {state.derivationError}
+              </div>
+            )}
+            <div
+              style={{
+                fontFamily: "'Space Mono',monospace",
+                fontSize: '26px',
+                color: 'var(--hint)',
+                letterSpacing: '5px'
+              }}
+            >
+              •••• ••••
+            </div>
+          </>
         )}
       </div>
 
