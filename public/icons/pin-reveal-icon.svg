@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Pin Reveal monochrome mark</title>
+  <rect width="512" height="512" rx="112" fill="#f8fafc" />
+  <path
+    fill="#0f172a"
+    d="M65 146h105c50 0 84 32 84 78 0 47-34 79-84 79h-38v77H65V146Zm67 59v40h35c13 0 21-8 21-20s-8-20-21-20h-35Zm132-59h66v234h-66V146Zm81 0h50l55 100V146h50v234h-50l-55-100v100h-50V146Z"
+  />
+  <circle cx="171" cy="407" r="18" fill="#0f172a" />
+  <circle cx="225" cy="407" r="18" fill="#0f172a" />
+  <circle cx="279" cy="407" r="18" fill="#0f172a" />
+  <circle cx="333" cy="407" r="18" fill="#0f172a" />
+</svg>
