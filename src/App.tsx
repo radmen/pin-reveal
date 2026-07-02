@@ -58,7 +58,7 @@ export function App(): JSX.Element {
   const [session, setSession] = useState<UnlockedSession | null | undefined>(
     typeof indexedDB === 'undefined' ? null : undefined
   );
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>(() => findStoredTheme() ?? 'dark');
   const [revealTime, setRevealTime] = useState(250);
   const [menuOpen, setMenuOpen] = useState(false);
   const [keyPersistenceError, setKeyPersistenceError] =
@@ -76,12 +76,6 @@ export function App(): JSX.Element {
     applyUpdate = subscribeToAppUpdate((): void => {
       setApplyAppUpdate(() => applyUpdate);
     });
-
-    const savedTheme = findStoredTheme();
-
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
 
     if (typeof indexedDB === 'undefined') {
       return;
