@@ -116,3 +116,7 @@
   font-size: 13px;
   cursor: pointer;
 }
+
+.secondaryButton[data-visible='false'] {
+  visibility: hidden;
+}

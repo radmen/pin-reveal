@@ -104,14 +104,15 @@ export function RevealScreen({
       </div>
 
       <div className={styles.actions}>
-        {started && (
-          <button
-            onClick={() => flash(cursor)}
-            className={styles.secondaryButton}
-          >
-            Re-reveal segment
-          </button>
-        )}
+        <button
+          onClick={() => flash(cursor)}
+          className={styles.secondaryButton}
+          disabled={!started}
+          aria-hidden={!started}
+          data-visible={started}
+        >
+          Re-reveal segment
+        </button>
         {!isLast && (
           <PrimaryButton onClick={() => flash(cursor + 1)}>
             {started ? 'Next →' : 'Reveal segment →'}
