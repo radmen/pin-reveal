@@ -70,6 +70,12 @@ const LIGHT: Record<string, string> = {
 };
 
 type Theme = 'dark' | 'light';
+type SessionOutcome = 'persisted' | 'in-memory';
+
+type UnlockedSession = {
+  key: CryptoKey;
+  outcome: SessionOutcome;
+};
 
 function findStoredTheme(): Theme | null {
   try {
@@ -96,7 +102,7 @@ function storeThemePreference(theme: Theme): void {
 export function App(): JSX.Element {
   // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
   // jsdom has no indexedDB, so skip Splash in tests by initialising to null.
-  const [key, setKey] = useState<CryptoKey | null | undefined>(
+  const [session, setSession] = useState<UnlockedSession | null | undefined>(
     typeof indexedDB === 'undefined' ? null : undefined
   );
   const [theme, setTheme] = useState<Theme>('dark');
@@ -121,11 +127,13 @@ export function App(): JSX.Element {
     }
 
     void loadMasterKey()
-      .then((loadedKey) => setKey(loadedKey ?? null))
+      .then((loadedKey) => {
+        setSession(loadedKey ? { key: loadedKey, outcome: 'persisted' } : null);
+      })
       .catch((error: unknown) => {
         if (error instanceof LoadKeyError) {
           setKeyPersistenceError(error);
-          setKey(null);
+          setSession(null);
           return;
         }
 
@@ -133,20 +141,23 @@ export function App(): JSX.Element {
       });
   }, []);
 
-  function handleLoginConfirm(confirmedKey: CryptoKey): void {
-    setKey(confirmedKey);
-    storeMasterKey(confirmedKey).catch((error: unknown) => {
+  async function handleLoginConfirm(confirmedKey: CryptoKey): Promise<void> {
+    try {
+      await storeMasterKey(confirmedKey);
+      setSession({ key: confirmedKey, outcome: 'persisted' });
+    } catch (error: unknown) {
       if (error instanceof StoreKeyError) {
         setKeyPersistenceError(error);
+        setSession({ key: confirmedKey, outcome: 'in-memory' });
         return;
       }
 
       throw error;
-    });
+    }
   }
 
   function handleLogout(): void {
-    setKey(null);
+    setSession(null);
     setLabelResult(null);
     setMenuOpen(false);
     forgetMasterKey()
@@ -169,18 +180,18 @@ export function App(): JSX.Element {
   }
 
   function screen(): JSX.Element {
-    if (key === undefined) {
+    if (session === undefined) {
       return <Splash />;
     }
 
-    if (key === null) {
+    if (session === null) {
       return <LoginScreen onConfirm={handleLoginConfirm} />;
     }
 
     if (!labelResult) {
       return (
         <LabelScreen
-          masterKey={key}
+          masterKey={session.key}
           onProceed={(pin, label) => setLabelResult({ pin, label })}
         />
       );
@@ -240,7 +251,8 @@ export function App(): JSX.Element {
           <Topbar
             theme={theme}
             onToggleTheme={toggleTheme}
-            showMenu={!!key}
+            showMenu={!!session}
+            sessionOutcome={session?.outcome ?? null}
             onOpenMenu={() => setMenuOpen(true)}
           />
           <KeyPersistenceWarningBanner

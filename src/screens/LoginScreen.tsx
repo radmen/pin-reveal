@@ -34,7 +34,7 @@ function loginReducer(state: LoginState, action: LoginAction): LoginState {
 }
 
 interface LoginScreenProps {
-  onConfirm(key: CryptoKey): void;
+  onConfirm(key: CryptoKey): Promise<void>;
 }
 
 const fieldStyle: JSX.CSSProperties = {
@@ -62,12 +62,14 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   const [state, dispatch] = useReducer(loginReducer, { kind: 'idle' });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const isVerified = state.kind === 'verified';
   const isDeriving = state.kind === 'deriving';
-  const disabled = isDeriving || (!isVerified && !(username && password));
+  const disabled =
+    isDeriving || isConfirming || (!isVerified && !(username && password));
 
-  async function generate() {
+  async function generate(): Promise<void> {
     const runId = Symbol();
     dispatch({ type: 'start', runId });
     const derivedKey = await deriveKey(password, username);
@@ -75,9 +77,18 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
     dispatch({ type: 'complete', runId, key: derivedKey, fingerprint });
   }
 
-  function resetIfNotIdle() {
-    if (state.kind !== 'idle') {
+  function resetIfNotIdle(): void {
+    if (state.kind !== 'idle' && !isConfirming) {
       dispatch({ type: 'reset' });
+    }
+  }
+
+  async function confirmLogin(key: CryptoKey): Promise<void> {
+    setIsConfirming(true);
+    try {
+      await onConfirm(key);
+    } finally {
+      setIsConfirming(false);
     }
   }
 
@@ -85,9 +96,15 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (disabled) return;
-        if (isVerified) onConfirm(state.key);
-        else void generate();
+        if (disabled) {
+          return;
+        }
+        if (isVerified) {
+          void confirmLogin(state.key);
+          return;
+        }
+
+        void generate();
       }}
       style={{
         height: '100%',
@@ -218,7 +235,9 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
 
       <div style={{ marginTop: 'auto' }}>
         <PrimaryButton type="submit" disabled={disabled}>
-          {isDeriving ? (
+          {isConfirming ? (
+            'Logging in...'
+          ) : isDeriving ? (
             <span
               style={{
                 display: 'flex',
