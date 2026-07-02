@@ -42,10 +42,12 @@ http {
 		keepalive_timeout 5;
 		client_max_body_size <%= ENV['NGINX_CLIENT_MAX_BODY_SIZE'] || 1 %>M;
 
+		<% if !%w[false 0 no off].include?(ENV.fetch('NGINX_HTTPS_REDIRECT', 'true').downcase) %>
 		## HTTPS Only
 		if ($http_x_forwarded_proto != "https") {
 			return 301 https://$host$request_uri;
 		}
+		<% end %>
 
 		## Document root
 		root /app/dist;
