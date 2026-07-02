@@ -2,8 +2,11 @@ import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { ScreenForm, ScreenHeader } from '../components/ScreenForm';
+import { Skeleton } from '../components/Skeleton';
 import { deriveKey } from '../derive-key.adapter';
 import { calculateLoginFingerprint } from '../derivation-contract';
+import styles from './LoginScreen.module.css';
 
 type LoginState =
   | { kind: 'idle'; derivationError?: string }
@@ -45,27 +48,6 @@ function loginReducer(state: LoginState, action: LoginAction): LoginState {
 interface LoginScreenProps {
   onConfirm(key: CryptoKey): Promise<void>;
 }
-
-const fieldStyle: JSX.CSSProperties = {
-  width: '100%',
-  background: 'var(--field)',
-  border: '1px solid var(--border)',
-  borderRadius: '11px',
-  padding: '14px',
-  color: 'var(--fg)',
-  fontFamily: "'Space Mono',monospace",
-  fontSize: '15px',
-  transition: 'border-color .15s,background .25s'
-};
-
-const skel = (width: string, height: string): JSX.CSSProperties => ({
-  height,
-  width,
-  borderRadius: '8px',
-  background: 'linear-gradient(90deg,var(--skel1),var(--skel2),var(--skel1))',
-  backgroundSize: '400px 100%',
-  animation: 'shimmer 1.3s linear infinite'
-});
 
 export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   const [state, dispatch] = useReducer(loginReducer, { kind: 'idle' });
@@ -110,7 +92,7 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
   }
 
   return (
-    <form
+    <ScreenForm
       onSubmit={(event) => {
         event.preventDefault();
         if (disabled) {
@@ -123,50 +105,20 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
 
         void generate();
       }}
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '30px 24px 28px',
-        animation: 'fadeplain .2s ease'
-      }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-        <CapLabel>Step 01 · Credentials</CapLabel>
-        <h1
-          style={{
-            fontSize: '29px',
-            fontWeight: 500,
-            margin: 0,
-            letterSpacing: '-.6px',
-            lineHeight: '1.05'
-          }}
-        >
-          Derive your key
-        </h1>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '13px',
-            lineHeight: '1.55',
-            color: 'var(--muted)',
-            maxWidth: '30ch'
-          }}
-        >
-          Nothing is stored or checked. The fingerprint is your only signal that
-          the pair is right.
-        </p>
-      </div>
+      <ScreenHeader
+        eyebrow={<CapLabel>Step 01 · Credentials</CapLabel>}
+        title="Derive your key"
+        intro={
+          <>
+            Nothing is stored or checked. The fingerprint is your only signal
+            that the pair is right.
+          </>
+        }
+      />
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          marginTop: '30px'
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+      <div className={styles.fields}>
+        <div className={styles.fieldGroup}>
           <CapLabel>Username</CapLabel>
           <input
             value={username}
@@ -177,10 +129,10 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
             placeholder="identity"
             autocomplete="off"
             spellcheck={false}
-            style={fieldStyle}
+            className={styles.field}
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+        <div className={styles.fieldGroup}>
           <CapLabel>Password</CapLabel>
           <input
             type="password"
@@ -191,47 +143,23 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
             }}
             placeholder="passphrase"
             autocomplete="off"
-            style={fieldStyle}
+            className={styles.field}
           />
         </div>
       </div>
 
-      <div
-        style={{
-          marginTop: '26px',
-          minHeight: '96px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '11px'
-        }}
-      >
+      <div className={styles.fingerprintPanel}>
         <CapLabel>Login fingerprint</CapLabel>
         {isDeriving && (
-          <div style={{ display: 'flex', gap: '11px' }}>
-            <div style={skel('120px', '32px')} />
-            <div style={skel('96px', '32px')} />
+          <div className={styles.skeletonRow}>
+            <Skeleton width="120px" height="32px" />
+            <Skeleton width="96px" height="32px" />
           </div>
         )}
         {isVerified && (
-          <div style={{ animation: 'fadein .28s ease' }}>
-            <div
-              style={{
-                fontFamily: "'Space Mono',monospace",
-                fontSize: '27px',
-                fontWeight: 700,
-                color: 'var(--fg)',
-                letterSpacing: '.5px'
-              }}
-            >
-              {state.fingerprint}
-            </div>
-            <div
-              style={{
-                fontSize: '12px',
-                color: 'var(--muted)',
-                marginTop: '7px'
-              }}
-            >
+          <div className={styles.result}>
+            <div className={styles.fingerprint}>{state.fingerprint}</div>
+            <div className={styles.hint}>
               Recognize these two words? Then proceed.
             </div>
           </div>
@@ -239,59 +167,22 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
         {state.kind === 'idle' && (
           <>
             {state.derivationError && (
-              <div
-                role="alert"
-                style={{
-                  border: '1px solid var(--border2)',
-                  borderRadius: '11px',
-                  padding: '12px 13px',
-                  color: 'var(--fg)',
-                  background: 'var(--field)',
-                  fontSize: '13px',
-                  lineHeight: '1.45'
-                }}
-              >
+              <div role="alert" className={styles.error}>
                 {state.derivationError}
               </div>
             )}
-            <div
-              style={{
-                fontFamily: "'Space Mono',monospace",
-                fontSize: '26px',
-                color: 'var(--hint)',
-                letterSpacing: '5px'
-              }}
-            >
-              •••• ••••
-            </div>
+            <div className={styles.placeholder}>•••• ••••</div>
           </>
         )}
       </div>
 
-      <div style={{ marginTop: 'auto' }}>
+      <div className={styles.actions}>
         <PrimaryButton type="submit" disabled={disabled}>
           {isConfirming ? (
             'Logging in...'
           ) : isDeriving ? (
-            <span
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px'
-              }}
-            >
-              <span
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid var(--primary-fg)',
-                  borderTopColor: 'transparent',
-                  borderRadius: '50%',
-                  display: 'inline-block',
-                  animation: 'spin .7s linear infinite'
-                }}
-              />
+            <span className={styles.buttonContent}>
+              <span className={styles.spinner} />
               Deriving…
             </span>
           ) : isVerified ? (
@@ -301,6 +192,6 @@ export function LoginScreen({ onConfirm }: LoginScreenProps): JSX.Element {
           )}
         </PrimaryButton>
       </div>
-    </form>
+    </ScreenForm>
   );
 }

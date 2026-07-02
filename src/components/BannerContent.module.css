@@ -1,0 +1,49 @@
+.content {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.title {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.refreshButton {
+  align-self: flex-start;
+  background: var(--primary-bg);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  color: var(--primary-fg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.dismissButton {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+}
+
+.details {
+  margin-top: 9px;
+}
+
+.summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.technicalDetails {
+  margin-top: 8px;
+  font-family: 'Space Mono', monospace;
+  color: var(--muted);
+}

@@ -1,4 +1,5 @@
 import type { ComponentChildren, JSX } from 'preact';
+import styles from './PrimaryButton.module.css';
 
 interface PrimaryButtonProps {
   children: ComponentChildren;
@@ -18,21 +19,7 @@ export function PrimaryButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      style={{
-        width: '100%',
-        padding: '16px',
-        borderRadius: '12px',
-        border: 'none',
-        background: 'var(--primary-bg)',
-        color: 'var(--primary-fg)',
-        fontFamily: "'Space Grotesk',sans-serif",
-        fontWeight: 600,
-        fontSize: '15px',
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.28 : 1,
-        transition: 'opacity .2s,background .25s,color .25s',
-        letterSpacing: '.2px'
-      }}
+      className={styles.button}
     >
       {children}
     </button>

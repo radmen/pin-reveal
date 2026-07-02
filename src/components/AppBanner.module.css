@@ -1,0 +1,20 @@
+.banner {
+  margin: 14px 18px 0;
+  padding: 13px 14px;
+  border: 1px solid var(--banner-border);
+  border-radius: 13px;
+  background: var(--banner-background);
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.banner[data-tone='update'] {
+  --banner-border: #38bdf8;
+  --banner-background: rgba(56, 189, 248, 0.12);
+}
+
+.banner[data-tone='warning'] {
+  --banner-border: #f59e0b;
+  --banner-background: rgba(245, 158, 11, 0.12);
+}

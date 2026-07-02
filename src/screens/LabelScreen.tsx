@@ -2,11 +2,14 @@ import type { JSX } from 'preact';
 import { useReducer, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { ScreenForm, ScreenHeader } from '../components/ScreenForm';
+import { Skeleton } from '../components/Skeleton';
 import {
   calculateLabelFingerprint,
   derivePin,
   normalizeLabel
 } from '../derivation-contract';
+import styles from './LabelScreen.module.css';
 
 type LabelState =
   | { kind: 'idle' }
@@ -41,43 +44,6 @@ interface LabelScreenProps {
   onProceed(pin: string, label: string): void;
 }
 
-const fieldStyle: JSX.CSSProperties = {
-  width: '100%',
-  background: 'var(--field)',
-  border: '1px solid var(--border)',
-  borderRadius: '11px',
-  padding: '14px',
-  color: 'var(--fg)',
-  fontFamily: "'Space Mono',monospace",
-  fontSize: '15px',
-  transition: 'border-color .15s,background .25s'
-};
-
-function lenBtn(active: boolean): JSX.CSSProperties {
-  return {
-    flex: 1,
-    padding: '13px 0',
-    borderRadius: '10px',
-    border: active ? '1px solid var(--fg)' : '1px solid var(--border)',
-    background: active ? 'var(--fg)' : 'transparent',
-    color: active ? 'var(--bg)' : 'var(--muted)',
-    fontFamily: "'Space Mono',monospace",
-    fontWeight: 700,
-    fontSize: '15px',
-    cursor: 'pointer',
-    transition: 'all .15s'
-  };
-}
-
-const skel = (width: string, height: string): JSX.CSSProperties => ({
-  height,
-  width,
-  borderRadius: '8px',
-  background: 'linear-gradient(90deg,var(--skel1),var(--skel2),var(--skel1))',
-  backgroundSize: '400px 100%',
-  animation: 'shimmer 1.3s linear infinite'
-});
-
 async function getLabelResult(
   masterKey: CryptoKey,
   label: string,
@@ -106,13 +72,13 @@ export function LabelScreen({
     !label.trim() || (customMode && (customLen < 3 || customLen > 12));
   const disabled = isBusy || (!isVerified && labelInvalid);
 
-  function resetIfNotIdle() {
+  function resetIfNotIdle(): void {
     if (state.kind !== 'idle') {
       dispatch({ type: 'reset' });
     }
   }
 
-  async function generate() {
+  async function generate(): Promise<void> {
     const resolvedLength = customMode
       ? Math.max(3, Math.min(12, customLen || 0))
       : length;
@@ -127,45 +93,27 @@ export function LabelScreen({
   }
 
   return (
-    <form
+    <ScreenForm
       onSubmit={(event) => {
         event.preventDefault();
-        if (disabled) return;
-        if (isVerified) onProceed(state.pin, label);
-        else void generate();
-      }}
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '30px 24px 28px',
-        animation: 'fadeplain .2s ease'
+        if (disabled) {
+          return;
+        }
+        if (isVerified) {
+          onProceed(state.pin, label);
+          return;
+        }
+
+        void generate();
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-        <CapLabel>Step 02 · Derive a PIN</CapLabel>
-        <h1
-          style={{
-            fontSize: '29px',
-            fontWeight: 500,
-            margin: 0,
-            letterSpacing: '-.6px',
-            lineHeight: '1.05'
-          }}
-        >
-          New PIN
-        </h1>
-      </div>
+      <ScreenHeader
+        eyebrow={<CapLabel>Step 02 · Derive a PIN</CapLabel>}
+        title="New PIN"
+      />
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px',
-          marginTop: '26px'
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+      <div className={styles.fields}>
+        <div className={styles.fieldGroup}>
           <CapLabel>Label</CapLabel>
           <input
             value={label}
@@ -176,24 +124,18 @@ export function LabelScreen({
             placeholder="e.g. visa, front-door"
             autocomplete="off"
             spellcheck={false}
-            style={fieldStyle}
+            className={styles.field}
           />
           {normalizeLabel(label) && (
-            <span
-              style={{
-                fontFamily: "'Space Mono',monospace",
-                fontSize: '11px',
-                color: 'var(--faint)'
-              }}
-            >
+            <span className={styles.normalizedLabel}>
               → {normalizeLabel(label)}
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+        <div className={`${styles.fieldGroup} ${styles.fieldGroupSpacious}`}>
           <CapLabel>PIN length</CapLabel>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className={styles.optionRow}>
             {([4, 6, 8] as const).map((digits) => (
               <button
                 type="button"
@@ -203,7 +145,8 @@ export function LabelScreen({
                   setCustomMode(false);
                   resetIfNotIdle();
                 }}
-                style={lenBtn(!customMode && length === digits)}
+                aria-pressed={!customMode && length === digits}
+                className={styles.optionButton}
               >
                 {digits}
               </button>
@@ -214,20 +157,14 @@ export function LabelScreen({
                 setCustomMode(true);
                 resetIfNotIdle();
               }}
-              style={lenBtn(customMode)}
+              aria-pressed={customMode}
+              className={styles.optionButton}
             >
               ···
             </button>
           </div>
           {customMode && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginTop: '2px'
-              }}
-            >
+            <div className={styles.customRow}>
               <input
                 type="number"
                 min="3"
@@ -239,110 +176,39 @@ export function LabelScreen({
                   );
                   resetIfNotIdle();
                 }}
-                style={{
-                  width: '84px',
-                  background: 'var(--field)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '10px',
-                  padding: '11px 12px',
-                  color: 'var(--fg)',
-                  fontFamily: "'Space Mono',monospace",
-                  fontSize: '15px',
-                  transition: 'border-color .15s'
-                }}
+                className={styles.customInput}
               />
-              <span
-                style={{
-                  fontFamily: "'Space Mono',monospace",
-                  fontSize: '12px',
-                  color: 'var(--muted)'
-                }}
-              >
-                digits (3–12)
-              </span>
+              <span className={styles.customCaption}>digits (3–12)</span>
             </div>
           )}
         </div>
       </div>
 
-      <div
-        style={{
-          marginTop: '26px',
-          minHeight: '84px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '11px'
-        }}
-      >
+      <div className={styles.fingerprintPanel}>
         <CapLabel>Label fingerprint</CapLabel>
         {isBusy && (
-          <div style={{ display: 'flex', gap: '11px' }}>
-            <div style={skel('108px', '30px')} />
-            <div style={skel('88px', '30px')} />
+          <div className={styles.skeletonRow}>
+            <Skeleton width="108px" height="30px" />
+            <Skeleton width="88px" height="30px" />
           </div>
         )}
         {isVerified && (
-          <div style={{ animation: 'fadein .28s ease' }}>
-            <div
-              style={{
-                fontFamily: "'Space Mono',monospace",
-                fontSize: '25px',
-                fontWeight: 700,
-                color: 'var(--fg)',
-                letterSpacing: '.5px'
-              }}
-            >
-              {state.fingerprint}
-            </div>
-            <div
-              style={{
-                fontSize: '12px',
-                color: 'var(--muted)',
-                marginTop: '7px'
-              }}
-            >
-              PIN ready — proceed to reveal it.
-            </div>
+          <div className={styles.result}>
+            <div className={styles.fingerprint}>{state.fingerprint}</div>
+            <div className={styles.hint}>PIN ready — proceed to reveal it.</div>
           </div>
         )}
         {state.kind === 'idle' && (
-          <div
-            style={{
-              fontFamily: "'Space Mono',monospace",
-              fontSize: '25px',
-              color: 'var(--hint)',
-              letterSpacing: '5px'
-            }}
-          >
-            •••• ••••
-          </div>
+          <div className={styles.placeholder}>•••• ••••</div>
         )}
       </div>
 
-      <div
-        style={{
-          marginTop: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
-        }}
-      >
+      <div className={styles.actions}>
         {isVerified && (
           <button
             type="button"
             onClick={() => dispatch({ type: 'reset' })}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '11px',
-              border: '1px solid var(--border)',
-              background: 'transparent',
-              color: 'var(--muted)',
-              fontFamily: "'Space Grotesk',sans-serif",
-              fontWeight: 500,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
+            className={styles.secondaryButton}
           >
             Reset
           </button>
@@ -351,6 +217,6 @@ export function LabelScreen({
           {isBusy ? 'Generating…' : isVerified ? 'Proceed →' : 'Generate PIN'}
         </PrimaryButton>
       </div>
-    </form>
+    </ScreenForm>
   );
 }
