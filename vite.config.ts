@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     preact(),
     VitePWA({
-      injectRegister: 'auto',
+      injectRegister: null,
       workbox: {
         globPatterns: ['**/*.{css,html,js,png,svg,webmanifest,woff,woff2}']
       },

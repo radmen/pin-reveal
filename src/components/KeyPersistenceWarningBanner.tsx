@@ -4,6 +4,7 @@ import {
   LoadKeyError,
   StoreKeyError
 } from '../key-persistence';
+import { AppBanner } from './AppBanner';
 
 type KeyPersistenceWarning = {
   userMessage: string;
@@ -65,19 +66,7 @@ export function KeyPersistenceWarningBanner({
   const warning = getKeyPersistenceWarning(error);
 
   return (
-    <div
-      role="alert"
-      style={{
-        margin: '14px 18px 0',
-        padding: '13px 14px',
-        border: '1px solid #f59e0b',
-        borderRadius: '13px',
-        background: 'rgba(245, 158, 11, .12)',
-        color: 'var(--fg)',
-        fontSize: '12.5px',
-        lineHeight: '1.45'
-      }}
-    >
+    <AppBanner role="alert" tone="warning">
       <div
         style={{
           display: 'flex',
@@ -122,6 +111,6 @@ export function KeyPersistenceWarningBanner({
           {warning.causeMessage && <div>{warning.causeMessage}</div>}
         </div>
       </details>
-    </div>
+    </AppBanner>
   );
 }

@@ -72,13 +72,12 @@ function assertAppleMetadata(indexHtml: string): void {
 
 function assertServiceWorkerRegistration(
   indexHtml: string,
-  registerServiceWorkerScript: string
+  builtJavaScript: string
 ): void {
-  expect(indexHtml).toContain('src="/registerSW.js"');
-  expect(registerServiceWorkerScript).toContain("'serviceWorker' in navigator");
-  expect(registerServiceWorkerScript).toContain(
-    "navigator.serviceWorker.register('/sw.js'"
-  );
+  expect(indexHtml).not.toContain('src="/registerSW.js"');
+  expect(builtJavaScript).toContain('/sw.js');
+  expect(builtJavaScript).toContain('workbox-window');
+  expect(builtJavaScript).toContain('A new version is ready');
   expect(existsSync(join(distPath, 'sw.js'))).toBe(true);
   expect(
     readdirSync(distPath).some((fileName: string): boolean =>
@@ -172,11 +171,7 @@ function assertOfflineAppShellAssets(manifest: WebManifest): void {
   const precacheUrls = readPrecacheUrls();
 
   expect(precacheUrls).toEqual(
-    expect.arrayContaining([
-      'index.html',
-      'registerSW.js',
-      'manifest.webmanifest'
-    ])
+    expect.arrayContaining(['index.html', 'manifest.webmanifest'])
   );
   expect(
     precacheUrls.some((url: string): boolean =>
@@ -196,6 +191,11 @@ function assertOfflineAppShellAssets(manifest: WebManifest): void {
   expect(
     precacheUrls.some((url: string): boolean =>
       /^assets\/.*\.woff2?$/.test(url)
+    )
+  ).toBe(true);
+  expect(
+    precacheUrls.some((url: string): boolean =>
+      /^assets\/workbox-window\.prod\.es5-.*\.js$/.test(url)
     )
   ).toBe(true);
   expect(precacheUrls).toContain('icons/pin-reveal-apple-touch-icon.png');
@@ -220,16 +220,17 @@ function assertFingerprintWordListIsBundled(): void {
 }
 
 describe('production PWA build artifacts', (): void => {
-  it('exposes install metadata and generated service worker registration', (): void => {
+  it('exposes install metadata and prompted service worker registration', (): void => {
     buildProductionApp();
 
     const indexHtml = readDistFile('index.html');
-    const registerServiceWorkerScript = readDistFile('registerSW.js');
+    const builtTextFiles = readBuiltTextFiles();
+    const builtJavaScript = builtTextFiles.join('\n');
     const manifest = readManifest();
 
     assertManifestMetadata(manifest, indexHtml);
     assertAppleMetadata(indexHtml);
-    assertServiceWorkerRegistration(indexHtml, registerServiceWorkerScript);
+    assertServiceWorkerRegistration(indexHtml, builtJavaScript);
     assertInstallIcons(manifest);
     assertNoGoogleFontDependencies();
     assertLocalFontAssets();

@@ -7,6 +7,7 @@ import {
 import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
+import { UpdateReadyBanner } from './components/UpdateReadyBanner';
 import {
   ForgetKeyError,
   forgetMasterKey,
@@ -18,6 +19,7 @@ import {
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
+import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
 
 const DARK: Record<string, string> = {
   '--bg': '#000',
@@ -110,12 +112,20 @@ export function App(): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [keyPersistenceError, setKeyPersistenceError] =
     useState<KeyPersistenceError | null>(null);
+  const [applyAppUpdate, setApplyAppUpdate] = useState<ApplyAppUpdate | null>(
+    null
+  );
   const [labelResult, setLabelResult] = useState<{
     pin: string;
     label: string;
   } | null>(null);
 
   useEffect(() => {
+    let applyUpdate: ApplyAppUpdate = () => {};
+    applyUpdate = subscribeToAppUpdate((): void => {
+      setApplyAppUpdate(() => applyUpdate);
+    });
+
     const savedTheme = findStoredTheme();
 
     if (savedTheme) {
@@ -271,6 +281,7 @@ export function App(): JSX.Element {
             sessionOutcome={session?.outcome ?? null}
             onOpenMenu={() => setMenuOpen(true)}
           />
+          <UpdateReadyBanner applyUpdate={applyAppUpdate} />
           <KeyPersistenceWarningBanner
             error={keyPersistenceError}
             onDismiss={() => setKeyPersistenceError(null)}
