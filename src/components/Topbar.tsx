@@ -4,6 +4,7 @@ interface TopbarProps {
   theme: 'dark' | 'light';
   onToggleTheme(): void;
   showMenu: boolean;
+  sessionOutcome: 'persisted' | 'in-memory' | null;
   onOpenMenu(): void;
 }
 
@@ -11,6 +12,7 @@ export function Topbar({
   theme,
   onToggleTheme,
   showMenu,
+  sessionOutcome,
   onOpenMenu
 }: TopbarProps): JSX.Element {
   return (
@@ -36,6 +38,22 @@ export function Topbar({
         pin<span style={{ color: 'var(--faint)' }}>·</span>derive
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {sessionOutcome === 'in-memory' && (
+          <span
+            style={{
+              border: '1px solid #f59e0b',
+              borderRadius: '999px',
+              color: '#f59e0b',
+              fontFamily: "'Space Mono',monospace",
+              fontSize: '10px',
+              letterSpacing: '.7px',
+              padding: '4px 7px',
+              textTransform: 'uppercase'
+            }}
+          >
+            in-memory
+          </span>
+        )}
         <button
           onClick={onToggleTheme}
           aria-label="Toggle theme"

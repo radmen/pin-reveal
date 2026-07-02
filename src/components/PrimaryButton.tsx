@@ -16,6 +16,7 @@ export function PrimaryButton({
   return (
     <button
       type={type}
+      disabled={disabled}
       onClick={onClick}
       style={{
         width: '100%',

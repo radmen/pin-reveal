@@ -55,6 +55,25 @@ function installIndexedDB(): void {
   });
 }
 
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(error: unknown): void;
+} {
+  let resolvePromise: (value: T) => void = () => {};
+  let rejectPromise: (error: unknown) => void = () => {};
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+
+  return {
+    promise,
+    resolve: resolvePromise,
+    reject: rejectPromise
+  };
+}
+
 beforeEach(async (): Promise<void> => {
   installIndexedDB();
   mockedDeriveKey.mockResolvedValue(await createKey());
@@ -73,6 +92,14 @@ async function submitLogin(): Promise<void> {
   fireEvent.click(
     screen.getByRole('button', { name: /generate fingerprint/i })
   );
+  fireEvent.click(await screen.findByRole('button', { name: /proceed/i }));
+}
+
+async function submitLabel(): Promise<void> {
+  fireEvent.input(await screen.findByPlaceholderText(/e.g. visa/i), {
+    target: { value: 'front-door' }
+  });
+  fireEvent.click(screen.getByRole('button', { name: /generate pin/i }));
   fireEvent.click(await screen.findByRole('button', { name: /proceed/i }));
 }
 
@@ -116,6 +143,74 @@ describe('App', (): void => {
       await screen.findByRole('heading', { name: /derive your key/i })
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('waits for persistence before entering a persisted session', async (): Promise<void> => {
+    const storeMasterKeyDeferred = createDeferred<void>();
+    mockedStoreMasterKey.mockReturnValue(storeMasterKeyDeferred.promise);
+
+    render(<App />);
+    await submitLogin();
+
+    const loginButton = screen.getByRole('button', { name: /logging in/i });
+    expect(loginButton).toBeDisabled();
+    expect(
+      screen.queryByRole('heading', { name: /new pin/i })
+    ).not.toBeInTheDocument();
+
+    storeMasterKeyDeferred.resolve();
+
+    expect(
+      await screen.findByRole('heading', { name: /new pin/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/in-memory/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('enters an in-memory session when login persistence fails', async (): Promise<void> => {
+    mockedStoreMasterKey.mockRejectedValue(
+      new StoreKeyError(new Error('write quota exceeded'))
+    );
+
+    render(<App />);
+    await submitLogin();
+    fireEvent.click(await screen.findByText(/technical details/i));
+
+    expect(
+      await screen.findByRole('heading', { name: /new pin/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/in-memory/i)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /your key could not be saved for next time/i
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /failed to store master key/i
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /write quota exceeded/i
+    );
+  });
+
+  it('keeps the in-memory badge visible across unlocked screens', async (): Promise<void> => {
+    mockedStoreMasterKey.mockRejectedValue(
+      new StoreKeyError(new Error('private browsing'))
+    );
+
+    render(<App />);
+    await submitLogin();
+    await submitLabel();
+
+    expect(
+      await screen.findByText(/press reveal to show segment/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/in-memory/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '←' }));
+
+    expect(
+      await screen.findByRole('heading', { name: /new pin/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/in-memory/i)).toBeInTheDocument();
   });
 
   it('shows expandable technical details for startup storage failures', async (): Promise<void> => {
