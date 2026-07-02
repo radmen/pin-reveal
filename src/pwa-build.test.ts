@@ -112,6 +112,52 @@ function assertInstallIcons(manifest: WebManifest): void {
   );
 }
 
+function readBuiltTextFiles(): string[] {
+  const assetFileNames = readdirSync(join(distPath, 'assets')).filter(
+    (fileName: string): boolean => /\.(css|js)$/.test(fileName)
+  );
+
+  return [
+    readDistFile('index.html'),
+    ...assetFileNames.map((fileName: string): string =>
+      readDistFile(join('assets', fileName))
+    )
+  ];
+}
+
+function assertNoGoogleFontDependencies(): void {
+  for (const fileContents of readBuiltTextFiles()) {
+    expect(fileContents).not.toContain('fonts.googleapis.com');
+    expect(fileContents).not.toContain('fonts.gstatic.com');
+  }
+
+  expect(readDistFile('index.html')).not.toContain(
+    'rel="preconnect" href="https://fonts.'
+  );
+}
+
+function assertLocalFontAssets(): void {
+  const assetFileNames = readdirSync(join(distPath, 'assets'));
+  const stylesheet = assetFileNames
+    .filter((fileName: string): boolean => fileName.endsWith('.css'))
+    .map((fileName: string): string => readDistFile(join('assets', fileName)))
+    .join('\n');
+
+  expect(stylesheet).toContain('font-family:Space Grotesk');
+  expect(stylesheet).toContain('font-family:Space Mono');
+  expect(stylesheet).toContain('space-grotesk-latin-400-normal');
+  expect(stylesheet).toContain('space-grotesk-latin-500-normal');
+  expect(stylesheet).toContain('space-grotesk-latin-600-normal');
+  expect(stylesheet).toContain('space-grotesk-latin-700-normal');
+  expect(stylesheet).toContain('space-mono-latin-400-normal');
+  expect(stylesheet).toContain('space-mono-latin-700-normal');
+  expect(
+    assetFileNames.some((fileName: string): boolean =>
+      fileName.endsWith('.woff2')
+    )
+  ).toBe(true);
+}
+
 describe('production PWA build artifacts', (): void => {
   it('exposes install metadata and generated service worker registration', (): void => {
     buildProductionApp();
@@ -124,5 +170,7 @@ describe('production PWA build artifacts', (): void => {
     assertAppleMetadata(indexHtml);
     assertServiceWorkerRegistration(indexHtml, registerServiceWorkerScript);
     assertInstallIcons(manifest);
+    assertNoGoogleFontDependencies();
+    assertLocalFontAssets();
   });
 });

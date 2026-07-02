@@ -13,6 +13,8 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@fontsource/space-grotesk": "^5.2.10",
+    "@fontsource/space-mono": "^5.2.9",
     "@noble/hashes": "^2.2.0",
     "@preact/preset-vite": "latest",
     "preact": "latest"
