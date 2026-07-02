@@ -17,6 +17,7 @@ import {
   StoreKeyError,
   storeMasterKey
 } from './key-persistence';
+import { subscribeToAppUpdate } from './pwa-update';
 
 vi.mock('./derive-key.adapter', () => ({
   deriveKey: vi.fn()
@@ -33,10 +34,18 @@ vi.mock('./key-persistence', async (importOriginal) => {
   };
 });
 
+vi.mock(
+  './pwa-update',
+  (): { subscribeToAppUpdate: ReturnType<typeof vi.fn> } => ({
+    subscribeToAppUpdate: vi.fn()
+  })
+);
+
 const mockedForgetMasterKey = vi.mocked(forgetMasterKey);
 const mockedDeriveKey = vi.mocked(deriveKey);
 const mockedLoadMasterKey = vi.mocked(loadMasterKey);
 const mockedStoreMasterKey = vi.mocked(storeMasterKey);
+const mockedSubscribeToAppUpdate = vi.mocked(subscribeToAppUpdate);
 
 function createKey(): Promise<CryptoKey> {
   return crypto.subtle.importKey(
@@ -81,6 +90,7 @@ beforeEach(async (): Promise<void> => {
   mockedForgetMasterKey.mockResolvedValue();
   mockedLoadMasterKey.mockResolvedValue(null);
   mockedStoreMasterKey.mockResolvedValue();
+  mockedSubscribeToAppUpdate.mockReturnValue((): void => {});
 });
 
 async function submitLogin(): Promise<void> {
@@ -114,6 +124,59 @@ afterEach((): void => {
 });
 
 describe('App', (): void => {
+  it('shows a non-blocking update banner when a newer build is ready', async (): Promise<void> => {
+    let notifyUpdateReady = (): void => {
+      throw new Error('Update-ready callback was not registered.');
+    };
+    const refresh = vi.fn();
+    mockedSubscribeToAppUpdate.mockImplementation(
+      (onUpdateReady: () => void): (() => void) => {
+        notifyUpdateReady = onUpdateReady;
+
+        return refresh;
+      }
+    );
+
+    render(<App />);
+    expect(
+      await screen.findByRole('heading', { name: /derive your key/i })
+    ).toBeInTheDocument();
+
+    notifyUpdateReady();
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /a new version is ready/i
+    );
+    expect(screen.getByPlaceholderText(/identity/i)).toBeEnabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('applies a ready update only after the user clicks refresh', async (): Promise<void> => {
+    let notifyUpdateReady = (): void => {
+      throw new Error('Update-ready callback was not registered.');
+    };
+    const refresh = vi.fn();
+    mockedSubscribeToAppUpdate.mockImplementation(
+      (onUpdateReady: () => void): (() => void) => {
+        notifyUpdateReady = onUpdateReady;
+
+        return refresh;
+      }
+    );
+
+    render(<App />);
+    expect(
+      await screen.findByRole('heading', { name: /derive your key/i })
+    ).toBeInTheDocument();
+
+    notifyUpdateReady();
+
+    expect(refresh).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: /refresh/i }));
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the product heading', async (): Promise<void> => {
     render(<App />);
 
