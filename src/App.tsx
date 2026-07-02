@@ -1,11 +1,16 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import {
+  KeyPersistenceWarningBanner,
+  type KeyPersistenceError
+} from './components/KeyPersistenceWarningBanner';
 import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
 import {
   ForgetKeyError,
   forgetMasterKey,
+  LoadKeyError,
   loadMasterKey,
   StoreKeyError,
   storeMasterKey
@@ -88,22 +93,6 @@ function storeThemePreference(theme: Theme): void {
   }
 }
 
-function ignoreStoreKeyError(error: unknown): void {
-  if (error instanceof StoreKeyError) {
-    return;
-  }
-
-  throw error;
-}
-
-function ignoreForgetKeyError(error: unknown): void {
-  if (error instanceof ForgetKeyError) {
-    return;
-  }
-
-  throw error;
-}
-
 export function App(): JSX.Element {
   // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
   // jsdom has no indexedDB, so skip Splash in tests by initialising to null.
@@ -113,6 +102,8 @@ export function App(): JSX.Element {
   const [theme, setTheme] = useState<Theme>('dark');
   const [revealTime, setRevealTime] = useState(250);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [keyPersistenceError, setKeyPersistenceError] =
+    useState<KeyPersistenceError | null>(null);
   const [labelResult, setLabelResult] = useState<{
     pin: string;
     label: string;
@@ -129,19 +120,45 @@ export function App(): JSX.Element {
       return;
     }
 
-    void loadMasterKey().then((loadedKey) => setKey(loadedKey ?? null));
+    void loadMasterKey()
+      .then((loadedKey) => setKey(loadedKey ?? null))
+      .catch((error: unknown) => {
+        if (error instanceof LoadKeyError) {
+          setKeyPersistenceError(error);
+          setKey(null);
+          return;
+        }
+
+        throw error;
+      });
   }, []);
 
   function handleLoginConfirm(confirmedKey: CryptoKey): void {
     setKey(confirmedKey);
-    storeMasterKey(confirmedKey).catch(ignoreStoreKeyError);
+    storeMasterKey(confirmedKey).catch((error: unknown) => {
+      if (error instanceof StoreKeyError) {
+        setKeyPersistenceError(error);
+        return;
+      }
+
+      throw error;
+    });
   }
 
   function handleLogout(): void {
     setKey(null);
     setLabelResult(null);
     setMenuOpen(false);
-    forgetMasterKey().catch(ignoreForgetKeyError);
+    forgetMasterKey()
+      .then(() => setKeyPersistenceError(null))
+      .catch((error: unknown) => {
+        if (error instanceof ForgetKeyError) {
+          setKeyPersistenceError(error);
+          return;
+        }
+
+        throw error;
+      });
   }
 
   function toggleTheme(): void {
@@ -225,6 +242,10 @@ export function App(): JSX.Element {
             onToggleTheme={toggleTheme}
             showMenu={!!key}
             onOpenMenu={() => setMenuOpen(true)}
+          />
+          <KeyPersistenceWarningBanner
+            error={keyPersistenceError}
+            onDismiss={() => setKeyPersistenceError(null)}
           />
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {screen()}
