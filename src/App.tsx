@@ -157,11 +157,27 @@ export function App(): JSX.Element {
   }
 
   function handleLogout(): void {
-    setSession(null);
-    setLabelResult(null);
+    const activeSession = session;
+
+    if (!activeSession) {
+      return;
+    }
+
     setMenuOpen(false);
+
+    if (activeSession.outcome === 'in-memory') {
+      setSession(null);
+      setLabelResult(null);
+      setKeyPersistenceError(null);
+      return;
+    }
+
     forgetMasterKey()
-      .then(() => setKeyPersistenceError(null))
+      .then(() => {
+        setSession(null);
+        setLabelResult(null);
+        setKeyPersistenceError(null);
+      })
       .catch((error: unknown) => {
         if (error instanceof ForgetKeyError) {
           setKeyPersistenceError(error);

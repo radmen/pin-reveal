@@ -11,6 +11,7 @@ import { App } from './App';
 import { deriveKey } from './derive-key.adapter';
 import {
   forgetMasterKey,
+  ForgetKeyError,
   loadMasterKey,
   LoadKeyError,
   StoreKeyError,
@@ -99,7 +100,11 @@ async function submitLabel(): Promise<void> {
   fireEvent.input(await screen.findByPlaceholderText(/e.g. visa/i), {
     target: { value: 'front-door' }
   });
+  await waitFor((): void => {
+    expect(screen.getByRole('button', { name: /generate pin/i })).toBeEnabled();
+  });
   fireEvent.click(screen.getByRole('button', { name: /generate pin/i }));
+  await screen.findByText(/pin ready/i);
   fireEvent.click(await screen.findByRole('button', { name: /proceed/i }));
 }
 
@@ -293,5 +298,96 @@ describe('App', (): void => {
     await waitFor((): void => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
+  });
+
+  it('logs out from an in-memory session without forgetting a persisted key', async (): Promise<void> => {
+    mockedStoreMasterKey.mockRejectedValue(
+      new StoreKeyError(new Error('private browsing'))
+    );
+
+    render(<App />);
+    await submitLogin();
+    await screen.findByRole('heading', { name: /new pin/i });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /open settings menu/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+
+    expect(mockedForgetMasterKey).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole('heading', { name: /derive your key/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('waits to forget a persisted key before logging out', async (): Promise<void> => {
+    const forgetMasterKeyDeferred = createDeferred<void>();
+    mockedForgetMasterKey.mockReturnValue(forgetMasterKeyDeferred.promise);
+
+    render(<App />);
+    await submitLogin();
+    await screen.findByRole('heading', { name: /new pin/i });
+    await submitLabel();
+    await screen.findByText(/press reveal to show segment/i);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /open settings menu/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+
+    expect(mockedForgetMasterKey).toHaveBeenCalledOnce();
+    expect(
+      screen.getByText(/press reveal to show segment/i)
+    ).toBeInTheDocument();
+
+    forgetMasterKeyDeferred.resolve();
+
+    expect(
+      await screen.findByRole('heading', { name: /derive your key/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await submitLogin();
+
+    expect(
+      await screen.findByRole('heading', { name: /new pin/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/press reveal to show segment/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('stays unlocked and shows a warning when persisted logout fails', async (): Promise<void> => {
+    mockedForgetMasterKey.mockRejectedValue(
+      new ForgetKeyError(new Error('IndexedDB delete failed'))
+    );
+
+    render(<App />);
+    await submitLogin();
+    await screen.findByRole('heading', { name: /new pin/i });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /open settings menu/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+    fireEvent.click(await screen.findByText(/technical details/i));
+
+    expect(
+      screen.getByRole('heading', { name: /new pin/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/reveal time/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /your saved key could not be forgotten/i
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /failed to forget master key/i
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /indexeddb delete failed/i
+    );
+    expect(
+      screen.queryByRole('button', { name: /retry/i })
+    ).not.toBeInTheDocument();
   });
 });
