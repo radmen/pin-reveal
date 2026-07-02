@@ -1,0 +1,44 @@
+.appShell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--backdrop);
+  font-family: 'Space Grotesk', sans-serif;
+  transition: background 0.25s;
+}
+
+.phoneFrame {
+  width: 440px;
+  height: min(800px, calc(100vh - 64px));
+  background: var(--bg);
+  border: 1px solid var(--phone-border);
+  border-radius: 22px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow);
+  transition:
+    background 0.25s,
+    border-color 0.25s;
+}
+
+.appSurface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  position: relative;
+  overflow: hidden;
+  transition:
+    background 0.25s,
+    color 0.25s;
+}
+
+.screenSlot {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}

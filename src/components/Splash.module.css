@@ -1,0 +1,13 @@
+.splash {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand {
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: var(--faint);
+}

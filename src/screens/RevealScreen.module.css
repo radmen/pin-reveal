@@ -1,0 +1,122 @@
+.screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px 28px;
+  animation: fadeplain 0.2s ease;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-family: 'Space Mono', monospace;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.label {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.headerSpacer {
+  width: 38px;
+}
+
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+
+.revealBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 300px;
+}
+
+.segment {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-family: 'Space Mono', monospace;
+  font-size: 24px;
+  letter-spacing: 3px;
+  font-weight: 700;
+  transition: all 0.12s;
+}
+
+.segment[data-state='hidden'] {
+  border: 1px solid var(--seg-border);
+  background: transparent;
+  color: var(--seg-fg);
+}
+
+.segment[data-state='active'] {
+  border: 1px solid var(--fg);
+  background: var(--active-bg);
+  color: var(--seg-fg);
+}
+
+.segment[data-state='shown'] {
+  border: 1px solid var(--fg);
+  background: var(--active-bg);
+  color: var(--fg);
+}
+
+.caption {
+  font-family: 'Space Mono', monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.secondaryButton {
+  width: 100%;
+  padding: 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.secondaryButton[data-visible='false'] {
+  visibility: hidden;
+}

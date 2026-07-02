@@ -1,0 +1,72 @@
+.topbar {
+  height: 54px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--topbar-border);
+}
+
+.brand {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--fg);
+}
+
+.brandSeparator {
+  color: var(--faint);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sessionBadge {
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  color: #f59e0b;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.7px;
+  padding: 4px 7px;
+  text-transform: uppercase;
+}
+
+.themeButton {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  transition: border-color 0.15s;
+}
+
+.menuButton {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  margin: -8px;
+}
+
+.menuLine {
+  width: 18px;
+  height: 1.5px;
+  background: var(--fg);
+  display: block;
+}

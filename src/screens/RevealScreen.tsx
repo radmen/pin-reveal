@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { CapLabel } from '../components/CapLabel';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { normalizeLabel } from '../derivation-contract';
+import styles from './RevealScreen.module.css';
 
 interface RevealScreenProps {
   pin: string;
@@ -11,42 +12,18 @@ interface RevealScreenProps {
   onExit(): void;
 }
 
-function segBox(active: boolean, shown: boolean): JSX.CSSProperties {
-  const base: JSX.CSSProperties = {
-    width: '60px',
-    height: '60px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '12px',
-    fontFamily: "'Space Mono',monospace",
-    fontSize: '24px',
-    letterSpacing: '3px',
-    fontWeight: 700,
-    transition: 'all .12s'
-  };
-  if (active && shown) {
-    return {
-      ...base,
-      border: '1px solid var(--fg)',
-      background: 'var(--active-bg)',
-      color: 'var(--fg)'
-    };
+type SegmentState = 'hidden' | 'active' | 'shown';
+
+function getSegmentState(active: boolean, shown: boolean): SegmentState {
+  if (shown) {
+    return 'shown';
   }
+
   if (active) {
-    return {
-      ...base,
-      border: '1px solid var(--fg)',
-      background: 'var(--active-bg)',
-      color: 'var(--seg-fg)'
-    };
+    return 'active';
   }
-  return {
-    ...base,
-    border: '1px solid var(--seg-border)',
-    background: 'transparent',
-    color: 'var(--seg-fg)'
-  };
+
+  return 'hidden';
 }
 
 export function RevealScreen({
@@ -77,7 +54,7 @@ export function RevealScreen({
     };
   }, []);
 
-  function flash(index: number) {
+  function flash(index: number): void {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
@@ -95,122 +72,47 @@ export function RevealScreen({
     : `Press Reveal to show segment 1 / ${segments.length}`;
 
   return (
-    <div
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '22px 24px 28px',
-        animation: 'fadeplain .2s ease'
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}
-      >
-        <button
-          onClick={onExit}
-          style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '10px',
-            border: '1px solid var(--border)',
-            background: 'transparent',
-            color: 'var(--fg)',
-            fontFamily: "'Space Mono',monospace",
-            fontSize: '16px',
-            cursor: 'pointer'
-          }}
-        >
+    <div className={styles.screen}>
+      <div className={styles.header}>
+        <button onClick={onExit} className={styles.backButton}>
           ←
         </button>
-        <span
-          style={{
-            fontFamily: "'Space Mono',monospace",
-            fontSize: '12px',
-            letterSpacing: '1px',
-            color: 'var(--muted)'
-          }}
-        >
-          {normalizedLabel}
-        </span>
-        <span style={{ width: '38px' }} />
+        <span className={styles.label}>{normalizedLabel}</span>
+        <span className={styles.headerSpacer} />
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '30px'
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '16px'
-          }}
-        >
+      <div className={styles.stage}>
+        <div className={styles.revealBlock}>
           <CapLabel>Step 03 · Reveal</CapLabel>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '10px',
-              justifyContent: 'center',
-              maxWidth: '300px'
-            }}
-          >
+          <div className={styles.segments}>
             {segments.map((segment, i) => {
               const active = i === cursor;
               const shown = active && visible;
               return (
-                <div key={i} style={segBox(active, shown)}>
+                <div
+                  key={i}
+                  className={styles.segment}
+                  data-state={getSegmentState(active, shown)}
+                >
                   {shown ? segment : '•'.repeat(segment.length)}
                 </div>
               );
             })}
           </div>
-          <span
-            style={{
-              fontFamily: "'Space Mono',monospace",
-              fontSize: '11.5px',
-              color: 'var(--muted)',
-              letterSpacing: '.5px'
-            }}
-          >
-            {caption}
-          </span>
+          <span className={styles.caption}>{caption}</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {started && (
-          <button
-            onClick={() => flash(cursor)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '11px',
-              border: '1px solid var(--border)',
-              background: 'transparent',
-              color: 'var(--muted)',
-              fontFamily: "'Space Grotesk',sans-serif",
-              fontWeight: 500,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
-          >
-            Re-reveal segment
-          </button>
-        )}
+      <div className={styles.actions}>
+        <button
+          onClick={() => flash(cursor)}
+          className={styles.secondaryButton}
+          disabled={!started}
+          aria-hidden={!started}
+          data-visible={started}
+        >
+          Re-reveal segment
+        </button>
         {!isLast && (
           <PrimaryButton onClick={() => flash(cursor + 1)}>
             {started ? 'Next →' : 'Reveal segment →'}

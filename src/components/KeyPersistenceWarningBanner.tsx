@@ -5,6 +5,7 @@ import {
   StoreKeyError
 } from '../key-persistence';
 import { AppBanner } from './AppBanner';
+import styles from './BannerContent.module.css';
 
 type KeyPersistenceWarning = {
   userMessage: string;
@@ -67,46 +68,22 @@ export function KeyPersistenceWarningBanner({
 
   return (
     <AppBanner role="alert" tone="warning">
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-          justifyContent: 'space-between'
-        }}
-      >
+      <div className={styles.content}>
         <div>
-          <strong style={{ display: 'block', marginBottom: '4px' }}>
-            {warning.userMessage}
-          </strong>
+          <strong className={styles.title}>{warning.userMessage}</strong>
           You can still derive your key and continue using the app.
         </div>
         <button
           aria-label="Dismiss warning"
           onClick={onDismiss}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--muted)',
-            cursor: 'pointer',
-            fontSize: '16px',
-            padding: 0
-          }}
+          className={styles.dismissButton}
         >
           x
         </button>
       </div>
-      <details style={{ marginTop: '9px' }}>
-        <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>
-          Technical details
-        </summary>
-        <div
-          style={{
-            marginTop: '8px',
-            fontFamily: "'Space Mono',monospace",
-            color: 'var(--muted)'
-          }}
-        >
+      <details className={styles.details}>
+        <summary className={styles.summary}>Technical details</summary>
+        <div className={styles.technicalDetails}>
           <div>{warning.message}</div>
           {warning.causeMessage && <div>{warning.causeMessage}</div>}
         </div>

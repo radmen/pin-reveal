@@ -20,56 +20,7 @@ import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
 import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
-
-const DARK: Record<string, string> = {
-  '--bg': '#000',
-  '--fg': '#fafafa',
-  '--muted': '#71717a',
-  '--faint': '#52525b',
-  '--field': '#0c0c0d',
-  '--border': '#262629',
-  '--border2': '#3f3f46',
-  '--primary-bg': '#fafafa',
-  '--primary-fg': '#000',
-  '--hint': '#222226',
-  '--seg-border': '#1c1c1f',
-  '--seg-fg': '#2e2e33',
-  '--active-bg': '#0d0d0d',
-  '--backdrop': '#161618',
-  '--phone-border': '#232327',
-  '--menu-bg': '#0a0a0b',
-  '--skel1': '#141416',
-  '--skel2': '#26262b',
-  '--topbar-border': '#131316',
-  '--placeholder': '#45454b',
-  '--scrim': 'rgba(0,0,0,.6)',
-  '--shadow': '0 30px 80px rgba(0,0,0,.55)'
-};
-
-const LIGHT: Record<string, string> = {
-  '--bg': '#ffffff',
-  '--fg': '#0c0c0d',
-  '--muted': '#6b6b70',
-  '--faint': '#9a9aa0',
-  '--field': '#f4f4f5',
-  '--border': '#dcdce0',
-  '--border2': '#aeaeb4',
-  '--primary-bg': '#0c0c0d',
-  '--primary-fg': '#ffffff',
-  '--hint': '#d8d8dc',
-  '--seg-border': '#e4e4e8',
-  '--seg-fg': '#bcbcc4',
-  '--active-bg': '#f7f7f8',
-  '--backdrop': '#e7e7ea',
-  '--phone-border': '#d0d0d6',
-  '--menu-bg': '#fbfbfc',
-  '--skel1': '#ececef',
-  '--skel2': '#dadade',
-  '--topbar-border': '#eeeef1',
-  '--placeholder': '#aeaeb4',
-  '--scrim': 'rgba(0,0,0,.32)',
-  '--shadow': '0 22px 60px rgba(0,0,0,.13)'
-};
+import styles from './App.module.css';
 
 type Theme = 'dark' | 'light';
 type SessionOutcome = 'persisted' | 'in-memory';
@@ -107,7 +58,7 @@ export function App(): JSX.Element {
   const [session, setSession] = useState<UnlockedSession | null | undefined>(
     typeof indexedDB === 'undefined' ? null : undefined
   );
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>(() => findStoredTheme() ?? 'dark');
   const [revealTime, setRevealTime] = useState(250);
   const [menuOpen, setMenuOpen] = useState(false);
   const [keyPersistenceError, setKeyPersistenceError] =
@@ -125,12 +76,6 @@ export function App(): JSX.Element {
     applyUpdate = subscribeToAppUpdate((): void => {
       setApplyAppUpdate(() => applyUpdate);
     });
-
-    const savedTheme = findStoredTheme();
-
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
 
     if (typeof indexedDB === 'undefined') {
       return;
@@ -232,48 +177,10 @@ export function App(): JSX.Element {
     );
   }
 
-  const vars = theme === 'light' ? LIGHT : DARK;
-
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        background: 'var(--backdrop)',
-        fontFamily: "'Space Grotesk',sans-serif",
-        transition: 'background .25s',
-        ...(vars as JSX.CSSProperties)
-      }}
-    >
-      <div
-        style={{
-          width: '440px',
-          height: 'min(800px,calc(100vh - 64px))',
-          background: 'var(--bg)',
-          border: '1px solid var(--phone-border)',
-          borderRadius: '22px',
-          overflow: 'hidden',
-          position: 'relative',
-          boxShadow: 'var(--shadow)',
-          transition: 'background .25s,border-color .25s'
-        }}
-      >
-        <div
-          style={{
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            background: 'var(--bg)',
-            color: 'var(--fg)',
-            position: 'relative',
-            overflow: 'hidden',
-            transition: 'background .25s,color .25s'
-          }}
-        >
+    <div className={styles.appShell} data-theme={theme}>
+      <div className={styles.phoneFrame}>
+        <div className={styles.appSurface}>
           <Topbar
             theme={theme}
             onToggleTheme={toggleTheme}
@@ -286,9 +193,7 @@ export function App(): JSX.Element {
             error={keyPersistenceError}
             onDismiss={() => setKeyPersistenceError(null)}
           />
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-            {screen()}
-          </div>
+          <div className={styles.screenSlot}>{screen()}</div>
           {menuOpen && (
             <MenuDrawer
               revealTime={revealTime}

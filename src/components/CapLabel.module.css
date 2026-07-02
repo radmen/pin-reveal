@@ -1,0 +1,7 @@
+.label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--faint);
+  text-transform: uppercase;
+}
