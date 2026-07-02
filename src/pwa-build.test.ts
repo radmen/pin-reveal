@@ -158,6 +158,67 @@ function assertLocalFontAssets(): void {
   ).toBe(true);
 }
 
+function readPrecacheUrls(): string[] {
+  return Array.from(readDistFile('sw.js').matchAll(/"url": "([^"]+)"/g)).map(
+    (match: RegExpMatchArray): string => match[1]
+  );
+}
+
+function assertPrecachedFileExists(precacheUrl: string): void {
+  expect(existsSync(join(distPath, precacheUrl))).toBe(true);
+}
+
+function assertOfflineAppShellAssets(manifest: WebManifest): void {
+  const precacheUrls = readPrecacheUrls();
+
+  expect(precacheUrls).toEqual(
+    expect.arrayContaining([
+      'index.html',
+      'registerSW.js',
+      'manifest.webmanifest'
+    ])
+  );
+  expect(
+    precacheUrls.some((url: string): boolean =>
+      /^assets\/index-.*\.js$/.test(url)
+    )
+  ).toBe(true);
+  expect(
+    precacheUrls.some((url: string): boolean =>
+      /^assets\/index-.*\.css$/.test(url)
+    )
+  ).toBe(true);
+  expect(
+    precacheUrls.some((url: string): boolean =>
+      /^assets\/derive-key\.worker-.*\.js$/.test(url)
+    )
+  ).toBe(true);
+  expect(
+    precacheUrls.some((url: string): boolean =>
+      /^assets\/.*\.woff2?$/.test(url)
+    )
+  ).toBe(true);
+  expect(precacheUrls).toContain('icons/pin-reveal-apple-touch-icon.png');
+
+  for (const icon of manifest.icons) {
+    expect(precacheUrls).toContain(icon.src.replace(/^\//, ''));
+  }
+
+  for (const precacheUrl of precacheUrls) {
+    assertPrecachedFileExists(precacheUrl);
+  }
+}
+
+function assertFingerprintWordListIsBundled(): void {
+  const builtJavaScript = readdirSync(join(distPath, 'assets'))
+    .filter((fileName: string): boolean => fileName.endsWith('.js'))
+    .map((fileName: string): string => readDistFile(join('assets', fileName)))
+    .join('\n');
+
+  expect(builtJavaScript).toContain('aardvark');
+  expect(builtJavaScript).toContain('Zulu');
+}
+
 describe('production PWA build artifacts', (): void => {
   it('exposes install metadata and generated service worker registration', (): void => {
     buildProductionApp();
@@ -172,5 +233,7 @@ describe('production PWA build artifacts', (): void => {
     assertInstallIcons(manifest);
     assertNoGoogleFontDependencies();
     assertLocalFontAssets();
+    assertOfflineAppShellAssets(manifest);
+    assertFingerprintWordListIsBundled();
   });
 });

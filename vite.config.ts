@@ -7,6 +7,9 @@ export default defineConfig({
     preact(),
     VitePWA({
       injectRegister: 'auto',
+      workbox: {
+        globPatterns: ['**/*.{css,html,js,png,svg,webmanifest,woff,woff2}']
+      },
       manifest: {
         name: 'Pin Reveal',
         short_name: 'Pin Reveal',
