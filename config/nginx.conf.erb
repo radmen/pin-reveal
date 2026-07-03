@@ -52,6 +52,36 @@ http {
 		## Document root
 		root /app/dist;
 
+		location = / {
+			add_header Cache-Control "no-cache" always;
+			try_files /index.html =404;
+		}
+
+		location = /index.html {
+			add_header Cache-Control "no-cache" always;
+			try_files $uri =404;
+		}
+
+		location = /sw.js {
+			add_header Cache-Control "no-cache" always;
+			try_files $uri =404;
+		}
+
+		location = /manifest.webmanifest {
+			add_header Cache-Control "no-cache" always;
+			try_files $uri =404;
+		}
+
+		location /assets/ {
+			add_header Cache-Control "public, max-age=31536000, immutable" always;
+			try_files $uri =404;
+		}
+
+		location ~ ^/workbox-[^/]+\.js$ {
+			add_header Cache-Control "public, max-age=31536000, immutable" always;
+			try_files $uri =404;
+		}
+
 		location / {
 			## Clean URLs: match on extensionless requests.
 			# try_files $uri $uri/ $uri.html =404;
