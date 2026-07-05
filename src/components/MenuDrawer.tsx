@@ -40,9 +40,10 @@ export function MenuDrawer({
         </div>
 
         {sessionOutcome === 'persisted' && (
-          <button
-            type="button"
-            onClick={() => {
+          <a
+            href="#vault"
+            onClick={(event) => {
+              event.preventDefault();
               onClose();
               onOpenVault();
             }}
@@ -53,7 +54,7 @@ export function MenuDrawer({
               Vault
             </span>
             <span className={styles.vaultNavStatus}>{vaultStatusLabel}</span>
-          </button>
+          </a>
         )}
 
         <div className={styles.section}>

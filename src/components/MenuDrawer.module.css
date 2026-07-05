@@ -61,6 +61,7 @@
   color: var(--fg);
   cursor: pointer;
   margin-bottom: 26px;
+  text-decoration: none;
 }
 
 .vaultNavLabel {
