@@ -137,10 +137,7 @@ function assertNoGoogleFontDependencies(): void {
 
 function assertLocalFontAssets(): void {
   const assetFileNames = readdirSync(join(distPath, 'assets'));
-  const stylesheet = assetFileNames
-    .filter((fileName: string): boolean => fileName.endsWith('.css'))
-    .map((fileName: string): string => readDistFile(join('assets', fileName)))
-    .join('\n');
+  const stylesheet = readBuiltStylesheet();
 
   expect(stylesheet).toContain('font-family:Space Grotesk');
   expect(stylesheet).toContain('font-family:Space Mono');
@@ -161,6 +158,19 @@ function readPrecacheUrls(): string[] {
   return Array.from(readDistFile('sw.js').matchAll(/"url": "([^"]+)"/g)).map(
     (match: RegExpMatchArray): string => match[1]
   );
+}
+
+function readBuiltStylesheet(): string {
+  const assetFileNames = readdirSync(join(distPath, 'assets'));
+
+  return assetFileNames
+    .filter((fileName: string): boolean => fileName.endsWith('.css'))
+    .map((fileName: string): string => readDistFile(join('assets', fileName)))
+    .join('\n');
+}
+
+function assertCssModuleClassNamesAreOpaque(): void {
+  expect(readBuiltStylesheet()).not.toMatch(/\.[A-Za-z0-9_-]*vault/i);
 }
 
 function assertPrecachedFileExists(precacheUrl: string): void {
@@ -234,6 +244,7 @@ describe('production PWA build artifacts', (): void => {
     assertInstallIcons(manifest);
     assertNoGoogleFontDependencies();
     assertLocalFontAssets();
+    assertCssModuleClassNamesAreOpaque();
     assertOfflineAppShellAssets(manifest);
     assertFingerprintWordListIsBundled();
   });

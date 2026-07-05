@@ -3,6 +3,11 @@ import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  css: {
+    modules: {
+      generateScopedName: 'pr_[hash:base64:8]'
+    }
+  },
   plugins: [
     preact(),
     VitePWA({
