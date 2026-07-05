@@ -141,6 +141,28 @@ describe('vault passkey adapter', (): void => {
       );
     });
 
+    it('throws VaultPasskeyNotSupportedError on NotSupportedError', async (): Promise<void> => {
+      const notSupported = Object.assign(new Error('Unsupported'), {
+        name: 'NotSupportedError'
+      });
+      installFakeWebAuthn({ create: () => Promise.reject(notSupported) });
+
+      await expect(createVaultPasskey()).rejects.toBeInstanceOf(
+        VaultPasskeyNotSupportedError
+      );
+    });
+
+    it('throws VaultPasskeyNotSupportedError on SecurityError', async (): Promise<void> => {
+      const securityError = Object.assign(new Error('Security error'), {
+        name: 'SecurityError'
+      });
+      installFakeWebAuthn({ create: () => Promise.reject(securityError) });
+
+      await expect(createVaultPasskey()).rejects.toBeInstanceOf(
+        VaultPasskeyNotSupportedError
+      );
+    });
+
     it('wraps other errors in VaultPasskeyError', async (): Promise<void> => {
       const cause = new Error('hardware failure');
       installFakeWebAuthn({ create: () => Promise.reject(cause) });
@@ -193,6 +215,28 @@ describe('vault passkey adapter', (): void => {
       await expect(
         getVaultPrfOutput(new Uint8Array(16), new Uint8Array(32))
       ).rejects.toBeInstanceOf(VaultPasskeyCancelledError);
+    });
+
+    it('throws VaultPasskeyNotSupportedError on NotSupportedError', async (): Promise<void> => {
+      const notSupported = Object.assign(new Error('Unsupported'), {
+        name: 'NotSupportedError'
+      });
+      installFakeWebAuthn({ get: () => Promise.reject(notSupported) });
+
+      await expect(
+        getVaultPrfOutput(new Uint8Array(16), new Uint8Array(32))
+      ).rejects.toBeInstanceOf(VaultPasskeyNotSupportedError);
+    });
+
+    it('throws VaultPasskeyNotSupportedError on SecurityError', async (): Promise<void> => {
+      const securityError = Object.assign(new Error('Security error'), {
+        name: 'SecurityError'
+      });
+      installFakeWebAuthn({ get: () => Promise.reject(securityError) });
+
+      await expect(
+        getVaultPrfOutput(new Uint8Array(16), new Uint8Array(32))
+      ).rejects.toBeInstanceOf(VaultPasskeyNotSupportedError);
     });
 
     it('wraps other errors in VaultPasskeyError', async (): Promise<void> => {

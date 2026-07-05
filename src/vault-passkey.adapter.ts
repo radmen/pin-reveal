@@ -25,6 +25,17 @@ export type VaultPasskeyCreation = {
   prfOutput: Uint8Array<ArrayBuffer>;
 };
 
+function isWebAuthnCancelError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'NotAllowedError';
+}
+
+function isWebAuthnUnsupportedError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'NotSupportedError' || error.name === 'SecurityError')
+  );
+}
+
 export async function checkPrfSupport(): Promise<boolean> {
   try {
     if (
@@ -97,10 +108,15 @@ export async function createVaultPasskey(): Promise<VaultPasskeyCreation> {
       }
     });
     credential = result as PublicKeyCredential;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'NotAllowedError') {
+  } catch (error: unknown) {
+    if (isWebAuthnCancelError(error)) {
       throw new VaultPasskeyCancelledError();
     }
+
+    if (isWebAuthnUnsupportedError(error)) {
+      throw new VaultPasskeyNotSupportedError();
+    }
+
     throw new VaultPasskeyError(error);
   }
 
@@ -150,10 +166,15 @@ export async function getVaultPrfOutput(
       }
     });
     assertion = result as PublicKeyCredential;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'NotAllowedError') {
+  } catch (error: unknown) {
+    if (isWebAuthnCancelError(error)) {
       throw new VaultPasskeyCancelledError();
     }
+
+    if (isWebAuthnUnsupportedError(error)) {
+      throw new VaultPasskeyNotSupportedError();
+    }
+
     throw new VaultPasskeyError(error);
   }
 

@@ -134,9 +134,9 @@ export function VaultScreen({
           <div className={styles.stateTextBlock}>
             <h2 className={styles.stateHeading}>Vault unavailable</h2>
             <p className={styles.stateText}>
-              This browser or device doesn't support the biometric-backed key
-              the Vault needs. There's no weaker fallback — Saved Labels stay
-              off here.
+              This browser or device may support biometric scans, but it didn't
+              provide the passkey PRF output the Vault needs for encryption.
+              There's no weaker fallback — Saved Labels stay off here.
             </p>
           </div>
         </div>
