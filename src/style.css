@@ -13,6 +13,12 @@ body {
   margin: 0;
 }
 
+button {
+  appearance: none;
+  -moz-appearance: none;
+  font: inherit;
+}
+
 [data-theme='dark'] {
   --bg: #000;
   --fg: #fafafa;
