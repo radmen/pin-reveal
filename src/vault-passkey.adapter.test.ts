@@ -81,7 +81,7 @@ describe('vault passkey adapter', (): void => {
       await expect(checkPrfSupport()).resolves.toBe(true);
     });
 
-    it('returns false when getClientCapabilities reports no prf', async (): Promise<void> => {
+    it('returns false when getClientCapabilities reports no PRF support', async (): Promise<void> => {
       installFakeWebAuthn({
         getClientCapabilities: () => Promise.resolve({ prf: false })
       });
@@ -89,10 +89,19 @@ describe('vault passkey adapter', (): void => {
       await expect(checkPrfSupport()).resolves.toBe(false);
     });
 
-    it('returns false when getClientCapabilities is absent', async (): Promise<void> => {
+    it('falls back to platform authenticator availability when getClientCapabilities is absent', async (): Promise<void> => {
       installFakeWebAuthn({
         isUserVerifyingPlatformAuthenticatorAvailable: () =>
           Promise.resolve(true)
+      });
+
+      await expect(checkPrfSupport()).resolves.toBe(true);
+    });
+
+    it('returns false when the platform authenticator fallback reports unavailable', async (): Promise<void> => {
+      installFakeWebAuthn({
+        isUserVerifyingPlatformAuthenticatorAvailable: () =>
+          Promise.resolve(false)
       });
 
       await expect(checkPrfSupport()).resolves.toBe(false);

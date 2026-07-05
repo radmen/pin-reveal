@@ -30,25 +30,30 @@ export async function checkPrfSupport(): Promise<boolean> {
     if (
       typeof window === 'undefined' ||
       !window.PublicKeyCredential ||
-      !navigator.credentials
-    ) {
-      return false;
-    }
-    if (
-      !(
-        'getClientCapabilities' in
-        (PublicKeyCredential as unknown as Record<string, unknown>)
-      )
+      !navigator.credentials?.create ||
+      !navigator.credentials?.get
     ) {
       return false;
     }
 
-    const caps = await (
-      PublicKeyCredential as unknown as {
-        getClientCapabilities(): Promise<Record<string, boolean>>;
+    const publicKeyCredential = PublicKeyCredential as unknown as {
+      getClientCapabilities?: () => Promise<Record<string, boolean>>;
+      isUserVerifyingPlatformAuthenticatorAvailable?: () => Promise<boolean>;
+    };
+
+    if (publicKeyCredential.getClientCapabilities) {
+      const capabilities = await publicKeyCredential.getClientCapabilities();
+
+      if (typeof capabilities['prf'] === 'boolean') {
+        return capabilities['prf'];
       }
-    ).getClientCapabilities();
-    return !!caps['prf'];
+    }
+
+    if (publicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+      return publicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    }
+
+    return true;
   } catch {
     return false;
   }
