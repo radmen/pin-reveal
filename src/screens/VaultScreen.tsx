@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { PrimaryButton } from '../components/PrimaryButton';
+import type { SavedLabel } from '../vault-persistence';
 import styles from './VaultScreen.module.css';
 
 export type VaultStatus = 'unavailable' | 'unenrolled' | 'locked' | 'unlocked';
@@ -8,13 +9,13 @@ export type VaultStatus = 'unavailable' | 'unenrolled' | 'locked' | 'unlocked';
 interface VaultScreenProps {
   status: VaultStatus;
   isBusy: boolean;
-  savedLabels: string[];
+  savedLabels: SavedLabel[];
   onEnable(): void;
   onUnlock(): void;
   onLock(): void;
   onDisable(): void;
-  onSelectLabel(label: string): void;
-  onRemoveLabel(label: string): void;
+  onSelectLabel(label: SavedLabel): void;
+  onRemoveLabel(label: SavedLabel): void;
   onExit(): void;
 }
 
@@ -57,11 +58,11 @@ function FingerprintIcon({
 }
 
 function LabelRow({
-  name,
+  label,
   onSelect,
   onRemove
 }: {
-  name: string;
+  label: SavedLabel;
   onSelect(): void;
   onRemove(): void;
 }): JSX.Element {
@@ -91,7 +92,7 @@ function LabelRow({
   return (
     <div className={styles.labelRow}>
       <button type="button" onClick={onSelect} className={styles.labelName}>
-        {name}
+        {label.originalLabel}
       </button>
       <button
         type="button"
@@ -187,8 +188,8 @@ export function VaultScreen({
               <div className={styles.labelList}>
                 {savedLabels.map((label) => (
                   <LabelRow
-                    key={label}
-                    name={label}
+                    key={`${label.normalizedLabel}:${label.pinLength}`}
+                    label={label}
                     onSelect={() => onSelectLabel(label)}
                     onRemove={() => onRemoveLabel(label)}
                   />

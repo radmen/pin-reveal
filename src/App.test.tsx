@@ -150,7 +150,6 @@ const fakePasskeyCreation = {
   prfSalt: new Uint8Array([4, 5, 6]),
   prfOutput: new Uint8Array(32).fill(9)
 };
-
 function createVaultAesKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
     'encrypt',
@@ -533,6 +532,7 @@ describe('App', (): void => {
     fireEvent.click(screen.getByRole('button', { name: /log out/i }));
 
     expect(mockedForgetMasterKey).toHaveBeenCalledOnce();
+    expect(mockedForgetVault).toHaveBeenCalledOnce();
     expect(
       screen.getByText(/press reveal to show segment/i)
     ).toBeInTheDocument();
@@ -642,10 +642,12 @@ describe('App — Vault', (): void => {
     ).toBeInTheDocument();
   });
 
-  it('enables the vault and shows empty state after creation', async (): Promise<void> => {
+  it('enables the vault and requires unlock before showing empty state', async (): Promise<void> => {
     mockedLoadMasterKey.mockResolvedValue(await createKey());
     mockedCheckPrfSupport.mockResolvedValue(true);
-    mockedLoadVaultCredential.mockResolvedValue(null);
+    mockedLoadVaultCredential
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(fakeVaultCredential);
 
     render(<App />);
     await screen.findByRole('heading', { name: /new pin/i });
@@ -655,9 +657,15 @@ describe('App — Vault', (): void => {
 
     fireEvent.click(screen.getByRole('button', { name: /enable vault/i }));
 
-    expect(await screen.findByText(/no saved labels yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /locked/i })
+    ).toBeInTheDocument();
     expect(mockedStoreVaultCredential).toHaveBeenCalledOnce();
     expect(mockedStoreVaultData).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: /unlock vault/i }));
+
+    expect(await screen.findByText(/no saved labels yet/i)).toBeInTheDocument();
   });
 
   it('shows locked state and unlocks to empty vault', async (): Promise<void> => {
@@ -685,15 +693,18 @@ describe('App — Vault', (): void => {
   it('disables the vault from unlocked state and returns to unenrolled', async (): Promise<void> => {
     mockedLoadMasterKey.mockResolvedValue(await createKey());
     mockedCheckPrfSupport.mockResolvedValue(true);
-    mockedLoadVaultCredential.mockResolvedValue(null);
+    mockedLoadVaultCredential
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(fakeVaultCredential);
 
     render(<App />);
     await screen.findByRole('heading', { name: /new pin/i });
 
-    // Enable vault to reach unlocked state
     fireEvent.click(await screen.findByRole('button', { name: /vault/i }));
     await screen.findByRole('heading', { name: /vault is off/i });
     fireEvent.click(screen.getByRole('button', { name: /enable vault/i }));
+    await screen.findByRole('heading', { name: /locked/i });
+    fireEvent.click(screen.getByRole('button', { name: /unlock vault/i }));
     await screen.findByText(/no saved labels yet/i);
 
     // Disable vault

@@ -89,13 +89,13 @@ describe('vault passkey adapter', (): void => {
       await expect(checkPrfSupport()).resolves.toBe(false);
     });
 
-    it('falls back to UVPA when getClientCapabilities is absent', async (): Promise<void> => {
+    it('returns false when getClientCapabilities is absent', async (): Promise<void> => {
       installFakeWebAuthn({
         isUserVerifyingPlatformAuthenticatorAvailable: () =>
           Promise.resolve(true)
       });
 
-      await expect(checkPrfSupport()).resolves.toBe(true);
+      await expect(checkPrfSupport()).resolves.toBe(false);
     });
   });
 

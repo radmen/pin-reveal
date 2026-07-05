@@ -9,6 +9,7 @@ import {
   loadVaultData,
   storeVaultCredential,
   storeVaultData,
+  type SavedLabel,
   type VaultEncryptedData
 } from './vault-persistence';
 
@@ -36,6 +37,15 @@ function makePrfOutput(): Uint8Array<ArrayBuffer> {
 
 function makePrfSalt(): Uint8Array<ArrayBuffer> {
   return new Uint8Array(32).fill(2);
+}
+
+function makeSavedLabel(label: string, lastUsedAt: number): SavedLabel {
+  return {
+    originalLabel: label,
+    normalizedLabel: label,
+    pinLength: 4,
+    lastUsedAt
+  };
 }
 
 beforeEach((): void => {
@@ -94,7 +104,9 @@ describe('vault persistence — forgetVault', (): void => {
     const prfOutput = makePrfOutput();
     const prfSalt = makePrfSalt();
     const vaultKey = await deriveVaultKey(prfOutput, prfSalt);
-    const data = await encryptLabels(vaultKey, ['test-label']);
+    const data = await encryptLabels(vaultKey, [
+      makeSavedLabel('test-label', 1)
+    ]);
 
     await storeVaultCredential({ credentialId: new Uint8Array([9]), prfSalt });
     await storeVaultData(data);
@@ -108,7 +120,11 @@ describe('vault persistence — forgetVault', (): void => {
 describe('vault persistence — crypto helpers', (): void => {
   it('encrypt then decrypt returns the original label list', async (): Promise<void> => {
     const vaultKey = await deriveVaultKey(makePrfOutput(), makePrfSalt());
-    const labels = ['front-door', 'visa', 'netflix'];
+    const labels = [
+      makeSavedLabel('front-door', 1),
+      makeSavedLabel('visa', 2),
+      makeSavedLabel('netflix', 3)
+    ];
 
     const encrypted = await encryptLabels(vaultKey, labels);
     const decrypted = await decryptLabels(vaultKey, encrypted);
@@ -119,8 +135,10 @@ describe('vault persistence — crypto helpers', (): void => {
   it('produces a fresh nonce (IV) on each encrypt call', async (): Promise<void> => {
     const vaultKey = await deriveVaultKey(makePrfOutput(), makePrfSalt());
 
-    const first = await encryptLabels(vaultKey, ['label-a']);
-    const second = await encryptLabels(vaultKey, ['label-a']);
+    const first = await encryptLabels(vaultKey, [makeSavedLabel('label-a', 1)]);
+    const second = await encryptLabels(vaultKey, [
+      makeSavedLabel('label-a', 1)
+    ]);
 
     // Same plaintext → different IV due to per-write random nonce
     expect(first.iv).not.toEqual(second.iv);
@@ -132,7 +150,9 @@ describe('vault persistence — crypto helpers', (): void => {
     const vaultKey = await deriveVaultKey(prfOutput, prfSalt);
     const sensitiveLabel = 'my-secret-card';
 
-    const encrypted = await encryptLabels(vaultKey, [sensitiveLabel]);
+    const encrypted = await encryptLabels(vaultKey, [
+      makeSavedLabel(sensitiveLabel, 1)
+    ]);
     await storeVaultData(encrypted);
     const loaded = await loadVaultData();
 

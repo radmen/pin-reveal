@@ -16,6 +16,13 @@ export type VaultEncryptedData = {
   ciphertext: Uint8Array<ArrayBuffer>;
 };
 
+export type SavedLabel = {
+  originalLabel: string;
+  normalizedLabel: string;
+  pinLength: number;
+  lastUsedAt: number;
+};
+
 export class VaultPersistenceError extends Error {
   constructor(message: string, cause: unknown) {
     super(message, { cause });
@@ -92,7 +99,7 @@ export async function deriveVaultKey(
 
 export async function encryptLabels(
   vaultKey: CryptoKey,
-  labels: string[]
+  labels: SavedLabel[]
 ): Promise<VaultEncryptedData> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const plaintext = new TextEncoder().encode(JSON.stringify(labels));
@@ -105,11 +112,11 @@ export async function encryptLabels(
 export async function decryptLabels(
   vaultKey: CryptoKey,
   data: VaultEncryptedData
-): Promise<string[]> {
+): Promise<SavedLabel[]> {
   const plaintext = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: data.iv },
     vaultKey,
     data.ciphertext
   );
-  return JSON.parse(new TextDecoder().decode(plaintext)) as string[];
+  return JSON.parse(new TextDecoder().decode(plaintext)) as SavedLabel[];
 }

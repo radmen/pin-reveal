@@ -25,7 +25,6 @@ export type VaultPasskeyCreation = {
   prfOutput: Uint8Array<ArrayBuffer>;
 };
 
-// ponytail: getClientCapabilities is Chrome 120+; falls back to UVPA as proxy.
 export async function checkPrfSupport(): Promise<boolean> {
   try {
     if (
@@ -36,17 +35,20 @@ export async function checkPrfSupport(): Promise<boolean> {
       return false;
     }
     if (
-      'getClientCapabilities' in
-      (PublicKeyCredential as unknown as Record<string, unknown>)
+      !(
+        'getClientCapabilities' in
+        (PublicKeyCredential as unknown as Record<string, unknown>)
+      )
     ) {
-      const caps = await (
-        PublicKeyCredential as unknown as {
-          getClientCapabilities(): Promise<Record<string, boolean>>;
-        }
-      ).getClientCapabilities();
-      return !!caps['prf'];
+      return false;
     }
-    return !!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+
+    const caps = await (
+      PublicKeyCredential as unknown as {
+        getClientCapabilities(): Promise<Record<string, boolean>>;
+      }
+    ).getClientCapabilities();
+    return !!caps['prf'];
   } catch {
     return false;
   }
