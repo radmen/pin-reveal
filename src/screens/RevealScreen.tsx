@@ -9,7 +9,11 @@ interface RevealScreenProps {
   pin: string;
   label: string;
   revealTime: number;
+  showSaveToVault: boolean;
+  isSaveToVaultBusy: boolean;
+  isSavedToVault: boolean;
   onExit(): void;
+  onSaveToVault(): void;
 }
 
 type SegmentState = 'hidden' | 'active' | 'shown';
@@ -30,7 +34,11 @@ export function RevealScreen({
   pin,
   label,
   revealTime,
-  onExit
+  showSaveToVault,
+  isSaveToVaultBusy,
+  isSavedToVault,
+  onExit,
+  onSaveToVault
 }: RevealScreenProps): JSX.Element {
   const segments = useMemo(() => {
     const result: string[] = [];
@@ -104,6 +112,19 @@ export function RevealScreen({
       </div>
 
       <div className={styles.actions}>
+        {isLast && showSaveToVault && (
+          <button
+            type="button"
+            onClick={onSaveToVault}
+            disabled={isSaveToVaultBusy}
+            className={styles.saveToVaultButton}
+          >
+            {isSaveToVaultBusy ? 'Saving…' : 'Save to Vault'}
+          </button>
+        )}
+        {isLast && isSavedToVault && (
+          <div className={styles.vaultSavedNote}>✓ Saved to Vault</div>
+        )}
         <button
           onClick={() => flash(cursor)}
           className={styles.secondaryButton}

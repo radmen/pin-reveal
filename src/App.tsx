@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   KeyPersistenceWarningBanner,
   type KeyPersistenceError
@@ -16,9 +16,27 @@ import {
   StoreKeyError,
   storeMasterKey
 } from './key-persistence';
+import {
+  checkPrfSupport,
+  createVaultPasskey,
+  getVaultPrfOutput,
+  VaultPasskeyNotSupportedError
+} from './vault-passkey.adapter';
+import {
+  decryptLabels,
+  deriveVaultKey,
+  encryptLabels,
+  forgetVault,
+  loadVaultCredential,
+  loadVaultData,
+  storeVaultCredential,
+  storeVaultData
+} from './vault-persistence';
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
+import { VaultScreen, type VaultStatus } from './screens/VaultScreen';
+import { normalizeLabel } from './derivation-contract';
 import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
 import styles from './App.module.css';
 
@@ -71,6 +89,26 @@ export function App(): JSX.Element {
     label: string;
   } | null>(null);
 
+  // vault
+  const [vaultStatus, setVaultStatus] = useState<VaultStatus>('unavailable');
+  const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
+  const [savedLabels, setSavedLabels] = useState<string[]>([]);
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const [showVault, setShowVault] = useState(false);
+  const [selectedFromVault, setSelectedFromVault] = useState(false);
+  const [pendingLabel, setPendingLabel] = useState('');
+  const [labelScreenKey, setLabelScreenKey] = useState(0);
+  const [vaultSaved, setVaultSaved] = useState(false);
+  const [vaultSaveBusy, setVaultSaveBusy] = useState(false);
+
+  const vaultKeyRef = useRef<CryptoKey | null>(null);
+  const savedLabelsRef = useRef<string[]>([]);
+  const vaultStatusRef = useRef<VaultStatus>('unavailable');
+
+  vaultKeyRef.current = vaultKey;
+  savedLabelsRef.current = savedLabels;
+  vaultStatusRef.current = vaultStatus;
+
   useEffect(() => {
     let applyUpdate: ApplyAppUpdate = () => {};
     applyUpdate = subscribeToAppUpdate((): void => {
@@ -83,7 +121,12 @@ export function App(): JSX.Element {
 
     void loadMasterKey()
       .then((loadedKey) => {
-        setSession(loadedKey ? { key: loadedKey, outcome: 'persisted' } : null);
+        if (loadedKey) {
+          setSession({ key: loadedKey, outcome: 'persisted' });
+          void initializeVaultStatus();
+        } else {
+          setSession(null);
+        }
       })
       .catch((error: unknown) => {
         if (error instanceof LoadKeyError) {
@@ -96,10 +139,25 @@ export function App(): JSX.Element {
       });
   }, []);
 
+  async function initializeVaultStatus(): Promise<void> {
+    try {
+      const supported = await checkPrfSupport();
+      if (!supported) {
+        setVaultStatus('unavailable');
+        return;
+      }
+      const credential = await loadVaultCredential();
+      setVaultStatus(credential ? 'locked' : 'unenrolled');
+    } catch {
+      setVaultStatus('unavailable');
+    }
+  }
+
   async function handleLoginConfirm(confirmedKey: CryptoKey): Promise<void> {
     try {
       await storeMasterKey(confirmedKey);
       setSession({ key: confirmedKey, outcome: 'persisted' });
+      void initializeVaultStatus();
     } catch (error: unknown) {
       if (error instanceof StoreKeyError) {
         setKeyPersistenceError(error);
@@ -119,6 +177,7 @@ export function App(): JSX.Element {
     }
 
     setMenuOpen(false);
+    resetVaultState();
 
     if (activeSession.outcome === 'in-memory') {
       setSession(null);
@@ -143,12 +202,167 @@ export function App(): JSX.Element {
       });
   }
 
+  function resetVaultState(): void {
+    setVaultKey(null);
+    setSavedLabels([]);
+    setVaultStatus('unavailable');
+    setShowVault(false);
+    setSelectedFromVault(false);
+    setPendingLabel('');
+    setVaultSaved(false);
+    setVaultSaveBusy(false);
+  }
+
   function toggleTheme(): void {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
 
     storeThemePreference(nextTheme);
     setTheme(nextTheme);
   }
+
+  async function handleEnableVault(): Promise<void> {
+    setVaultBusy(true);
+    try {
+      const { credentialId, prfSalt, prfOutput } = await createVaultPasskey();
+      const key = await deriveVaultKey(prfOutput, prfSalt);
+      const data = await encryptLabels(key, []);
+      await storeVaultCredential({ credentialId, prfSalt });
+      await storeVaultData(data);
+      setVaultKey(key);
+      setSavedLabels([]);
+      setVaultStatus('unlocked');
+    } catch (error) {
+      if (error instanceof VaultPasskeyNotSupportedError) {
+        setVaultStatus('unavailable');
+      }
+      // VaultPasskeyCancelledError: user cancelled, stay in current state
+    } finally {
+      setVaultBusy(false);
+    }
+  }
+
+  async function handleUnlockVault(): Promise<void> {
+    setVaultBusy(true);
+    try {
+      const credential = await loadVaultCredential();
+      if (!credential) {
+        return;
+      }
+      const prfOutput = await getVaultPrfOutput(
+        credential.credentialId,
+        credential.prfSalt
+      );
+      const key = await deriveVaultKey(prfOutput, credential.prfSalt);
+      const data = await loadVaultData();
+      const labels = data ? await decryptLabels(key, data) : [];
+      setVaultKey(key);
+      setSavedLabels(labels);
+      setVaultStatus('unlocked');
+    } catch {
+      // cancelled or failed: stay locked
+    } finally {
+      setVaultBusy(false);
+    }
+  }
+
+  function handleLockVault(): void {
+    setVaultKey(null);
+    setSavedLabels([]);
+    setVaultStatus('locked');
+  }
+
+  async function handleDisableVault(): Promise<void> {
+    await forgetVault();
+    setVaultKey(null);
+    setSavedLabels([]);
+    setVaultStatus('unenrolled');
+    // stay on vault screen so user sees the unenrolled state
+  }
+
+  function handleSelectLabel(label: string): void {
+    setPendingLabel(label);
+    setLabelScreenKey((k) => k + 1);
+    setSelectedFromVault(true);
+    setShowVault(false);
+    setVaultSaved(false);
+  }
+
+  async function handleRemoveLabel(label: string): Promise<void> {
+    const key = vaultKeyRef.current;
+    if (!key || vaultStatusRef.current !== 'unlocked') {
+      return;
+    }
+    const updated = savedLabelsRef.current.filter((l) => l !== label);
+    const data = await encryptLabels(key, updated);
+    await storeVaultData(data);
+    setSavedLabels(updated);
+  }
+
+  function handleLabelProceed(pin: string, label: string): void {
+    const isFromVault =
+      selectedFromVault &&
+      pendingLabel !== '' &&
+      normalizeLabel(label) === normalizeLabel(pendingLabel);
+    setSelectedFromVault(isFromVault);
+    setPendingLabel('');
+    setLabelResult({ pin, label });
+    setVaultSaved(false);
+  }
+
+  async function handleSaveToVault(): Promise<void> {
+    if (!labelResult) {
+      return;
+    }
+    const currentStatus = vaultStatusRef.current;
+    if (currentStatus !== 'locked' && currentStatus !== 'unlocked') {
+      return;
+    }
+
+    setVaultSaveBusy(true);
+    try {
+      let key = vaultKeyRef.current;
+      let labels = savedLabelsRef.current;
+
+      if (currentStatus === 'locked' || !key) {
+        const credential = await loadVaultCredential();
+        if (!credential) {
+          return;
+        }
+        const prfOutput = await getVaultPrfOutput(
+          credential.credentialId,
+          credential.prfSalt
+        );
+        key = await deriveVaultKey(prfOutput, credential.prfSalt);
+        const data = await loadVaultData();
+        labels = data ? await decryptLabels(key, data) : [];
+      }
+
+      const normalizedLabel = normalizeLabel(labelResult.label);
+      if (normalizedLabel && !labels.includes(normalizedLabel)) {
+        const updated = [...labels, normalizedLabel].sort();
+        const data = await encryptLabels(key!, updated);
+        await storeVaultData(data);
+      }
+
+      // lock after save per ADR 0004
+      setVaultKey(null);
+      setSavedLabels([]);
+      setVaultStatus('locked');
+      setVaultSaved(true);
+    } catch {
+      // cancelled or failed
+    } finally {
+      setVaultSaveBusy(false);
+    }
+  }
+
+  const isPersisted = session?.outcome === 'persisted';
+  const vaultEnrolled = vaultStatus === 'locked' || vaultStatus === 'unlocked';
+  const showSaveToVault =
+    isPersisted && vaultEnrolled && !selectedFromVault && !vaultSaved;
+
+  // ponytail: autoSaveNote shows after vault-selected label was derived
+  const autoSaveNote = isPersisted && selectedFromVault && vaultSaved;
 
   function screen(): JSX.Element {
     if (session === undefined) {
@@ -159,20 +373,52 @@ export function App(): JSX.Element {
       return <LoginScreen onConfirm={handleLoginConfirm} />;
     }
 
-    if (!labelResult) {
+    if (showVault) {
       return (
-        <LabelScreen
-          masterKey={session.key}
-          onProceed={(pin, label) => setLabelResult({ pin, label })}
+        <VaultScreen
+          status={vaultStatus}
+          isBusy={vaultBusy}
+          savedLabels={savedLabels}
+          onEnable={handleEnableVault}
+          onUnlock={handleUnlockVault}
+          onLock={handleLockVault}
+          onDisable={handleDisableVault}
+          onSelectLabel={handleSelectLabel}
+          onRemoveLabel={handleRemoveLabel}
+          onExit={() => setShowVault(false)}
         />
       );
     }
+
+    if (!labelResult) {
+      return (
+        <LabelScreen
+          key={labelScreenKey}
+          masterKey={session.key}
+          initialLabel={pendingLabel}
+          sessionOutcome={session.outcome}
+          vaultStatus={vaultStatus}
+          autoSaveNote={autoSaveNote}
+          onProceed={handleLabelProceed}
+          onOpenVault={() => setShowVault(true)}
+        />
+      );
+    }
+
     return (
       <RevealScreen
         pin={labelResult.pin}
         label={labelResult.label}
         revealTime={revealTime}
-        onExit={() => setLabelResult(null)}
+        showSaveToVault={showSaveToVault}
+        isSaveToVaultBusy={vaultSaveBusy}
+        isSavedToVault={vaultSaved}
+        onExit={() => {
+          setLabelResult(null);
+          setSelectedFromVault(false);
+          setPendingLabel('');
+        }}
+        onSaveToVault={handleSaveToVault}
       />
     );
   }
@@ -197,7 +443,13 @@ export function App(): JSX.Element {
           {menuOpen && (
             <MenuDrawer
               revealTime={revealTime}
+              sessionOutcome={session?.outcome ?? null}
+              vaultStatus={vaultStatus}
               onChangeRevealTime={setRevealTime}
+              onOpenVault={() => {
+                setMenuOpen(false);
+                setShowVault(true);
+              }}
               onLogout={handleLogout}
               onClose={() => setMenuOpen(false)}
             />

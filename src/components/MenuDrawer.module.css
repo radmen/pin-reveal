@@ -49,6 +49,50 @@
   padding: 4px;
 }
 
+.vaultNavButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 15px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  margin-bottom: 26px;
+}
+
+.vaultNavLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.vaultDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.vaultDot[data-status='unlocked'] {
+  background: var(--ok);
+}
+
+.vaultDot[data-status='locked'] {
+  background: var(--danger);
+}
+
+.vaultNavStatus {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .section {
   display: flex;
   flex-direction: column;

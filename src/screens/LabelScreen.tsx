@@ -9,6 +9,7 @@ import {
   derivePin,
   normalizeLabel
 } from '../derivation-contract';
+import type { VaultStatus } from './VaultScreen';
 import styles from './LabelScreen.module.css';
 
 type LabelState =
@@ -41,7 +42,12 @@ function labelReducer(state: LabelState, action: LabelAction): LabelState {
 
 interface LabelScreenProps {
   masterKey: CryptoKey;
+  initialLabel?: string;
+  sessionOutcome: 'persisted' | 'in-memory';
+  vaultStatus: VaultStatus;
+  autoSaveNote: boolean;
   onProceed(pin: string, label: string): void;
+  onOpenVault(): void;
 }
 
 async function getLabelResult(
@@ -58,10 +64,15 @@ async function getLabelResult(
 
 export function LabelScreen({
   masterKey,
-  onProceed
+  initialLabel = '',
+  sessionOutcome,
+  vaultStatus,
+  autoSaveNote,
+  onProceed,
+  onOpenVault
 }: LabelScreenProps): JSX.Element {
   const [state, dispatch] = useReducer(labelReducer, { kind: 'idle' });
-  const [label, setLabel] = useState('');
+  const [label, setLabel] = useState(initialLabel);
   const [length, setLength] = useState(4);
   const [customMode, setCustomMode] = useState(false);
   const [customLen, setCustomLen] = useState(5);
@@ -107,10 +118,22 @@ export function LabelScreen({
         void generate();
       }}
     >
-      <ScreenHeader
-        eyebrow={<CapLabel>Step 02 · Derive a PIN</CapLabel>}
-        title="New PIN"
-      />
+      <div className={styles.screenHeader}>
+        <ScreenHeader
+          eyebrow={<CapLabel>Step 02 · Derive a PIN</CapLabel>}
+          title="New PIN"
+        />
+        {sessionOutcome === 'persisted' && (
+          <button
+            type="button"
+            onClick={onOpenVault}
+            className={styles.vaultButton}
+          >
+            <span className={styles.vaultDot} data-status={vaultStatus} />
+            Vault
+          </button>
+        )}
+      </div>
 
       <div className={styles.fields}>
         <div className={styles.fieldGroup}>
@@ -196,6 +219,9 @@ export function LabelScreen({
           <div className={styles.result}>
             <div className={styles.fingerprint}>{state.fingerprint}</div>
             <div className={styles.hint}>PIN ready — proceed to reveal it.</div>
+            {autoSaveNote && (
+              <div className={styles.savedNote}>✓ Saved to Vault</div>
+            )}
           </div>
         )}
         {state.kind === 'idle' && (
