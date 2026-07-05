@@ -104,6 +104,7 @@ export function App(): JSX.Element {
   const vaultKeyRef = useRef<CryptoKey | null>(null);
   const savedLabelsRef = useRef<string[]>([]);
   const vaultStatusRef = useRef<VaultStatus>('unavailable');
+  const isRemovingLabelRef = useRef(false);
 
   vaultKeyRef.current = vaultKey;
   savedLabelsRef.current = savedLabels;
@@ -151,6 +152,24 @@ export function App(): JSX.Element {
     } catch {
       setVaultStatus('unavailable');
     }
+  }
+
+  async function performVaultUnlock(): Promise<{
+    key: CryptoKey;
+    labels: string[];
+  }> {
+    const credential = await loadVaultCredential();
+    if (!credential) {
+      throw new Error('No vault credential found.');
+    }
+    const prfOutput = await getVaultPrfOutput(
+      credential.credentialId,
+      credential.prfSalt
+    );
+    const key = await deriveVaultKey(prfOutput, credential.prfSalt);
+    const data = await loadVaultData();
+    const labels = data ? await decryptLabels(key, data) : [];
+    return { key, labels };
   }
 
   async function handleLoginConfirm(confirmedKey: CryptoKey): Promise<void> {
@@ -211,6 +230,7 @@ export function App(): JSX.Element {
     setPendingLabel('');
     setVaultSaved(false);
     setVaultSaveBusy(false);
+    setVaultBusy(false);
   }
 
   function toggleTheme(): void {
@@ -226,16 +246,23 @@ export function App(): JSX.Element {
       const { credentialId, prfSalt, prfOutput } = await createVaultPasskey();
       const key = await deriveVaultKey(prfOutput, prfSalt);
       const data = await encryptLabels(key, []);
-      await storeVaultCredential({ credentialId, prfSalt });
-      await storeVaultData(data);
+      try {
+        await storeVaultCredential({ credentialId, prfSalt });
+        await storeVaultData(data);
+      } catch (storageError: unknown) {
+        // Best-effort cleanup to avoid orphaned WebAuthn credential in IDB
+        await forgetVault().catch(() => {});
+        throw storageError;
+      }
       setVaultKey(key);
       setSavedLabels([]);
       setVaultStatus('unlocked');
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof VaultPasskeyNotSupportedError) {
         setVaultStatus('unavailable');
       }
       // VaultPasskeyCancelledError: user cancelled, stay in current state
+      // VaultPersistenceError: IDB cleaned up, stay unenrolled
     } finally {
       setVaultBusy(false);
     }
@@ -244,17 +271,7 @@ export function App(): JSX.Element {
   async function handleUnlockVault(): Promise<void> {
     setVaultBusy(true);
     try {
-      const credential = await loadVaultCredential();
-      if (!credential) {
-        return;
-      }
-      const prfOutput = await getVaultPrfOutput(
-        credential.credentialId,
-        credential.prfSalt
-      );
-      const key = await deriveVaultKey(prfOutput, credential.prfSalt);
-      const data = await loadVaultData();
-      const labels = data ? await decryptLabels(key, data) : [];
+      const { key, labels } = await performVaultUnlock();
       setVaultKey(key);
       setSavedLabels(labels);
       setVaultStatus('unlocked');
@@ -272,11 +289,15 @@ export function App(): JSX.Element {
   }
 
   async function handleDisableVault(): Promise<void> {
-    await forgetVault();
-    setVaultKey(null);
-    setSavedLabels([]);
-    setVaultStatus('unenrolled');
-    // stay on vault screen so user sees the unenrolled state
+    try {
+      await forgetVault();
+      setVaultKey(null);
+      setSavedLabels([]);
+      setVaultStatus('unenrolled');
+      // stay on vault screen so user sees the unenrolled state
+    } catch {
+      // IDB failure: stay in current state, user can retry
+    }
   }
 
   function handleSelectLabel(label: string): void {
@@ -284,18 +305,31 @@ export function App(): JSX.Element {
     setLabelScreenKey((k) => k + 1);
     setSelectedFromVault(true);
     setShowVault(false);
+    setLabelResult(null);
     setVaultSaved(false);
   }
 
   async function handleRemoveLabel(label: string): Promise<void> {
+    if (isRemovingLabelRef.current) {
+      return;
+    }
     const key = vaultKeyRef.current;
     if (!key || vaultStatusRef.current !== 'unlocked') {
       return;
     }
-    const updated = savedLabelsRef.current.filter((l) => l !== label);
-    const data = await encryptLabels(key, updated);
-    await storeVaultData(data);
-    setSavedLabels(updated);
+    isRemovingLabelRef.current = true;
+    try {
+      const updated = savedLabelsRef.current.filter(
+        (savedLabel) => savedLabel !== label
+      );
+      const data = await encryptLabels(key, updated);
+      await storeVaultData(data);
+      setSavedLabels(updated);
+    } catch {
+      // crypto or IDB failure: leave state unchanged
+    } finally {
+      isRemovingLabelRef.current = false;
+    }
   }
 
   function handleLabelProceed(pin: string, label: string): void {
@@ -307,6 +341,9 @@ export function App(): JSX.Element {
     setPendingLabel('');
     setLabelResult({ pin, label });
     setVaultSaved(false);
+    if (isFromVault) {
+      handleLockVault();
+    }
   }
 
   async function handleSaveToVault(): Promise<void> {
@@ -320,35 +357,33 @@ export function App(): JSX.Element {
 
     setVaultSaveBusy(true);
     try {
-      let key = vaultKeyRef.current;
-      let labels = savedLabelsRef.current;
+      let key: CryptoKey;
+      let labels: string[];
 
-      if (currentStatus === 'locked' || !key) {
-        const credential = await loadVaultCredential();
-        if (!credential) {
-          return;
-        }
-        const prfOutput = await getVaultPrfOutput(
-          credential.credentialId,
-          credential.prfSalt
-        );
-        key = await deriveVaultKey(prfOutput, credential.prfSalt);
-        const data = await loadVaultData();
-        labels = data ? await decryptLabels(key, data) : [];
+      if (currentStatus === 'locked' || !vaultKeyRef.current) {
+        const unlocked = await performVaultUnlock();
+        key = unlocked.key;
+        labels = unlocked.labels;
+      } else {
+        key = vaultKeyRef.current;
+        labels = savedLabelsRef.current;
       }
 
       const normalizedLabel = normalizeLabel(labelResult.label);
-      if (normalizedLabel && !labels.includes(normalizedLabel)) {
-        const updated = [...labels, normalizedLabel].sort();
-        const data = await encryptLabels(key!, updated);
+      if (normalizedLabel) {
+        // Recency ordering: most recently saved first; dedup by removing any existing entry
+        const updated = [
+          normalizedLabel,
+          ...labels.filter((savedLabel) => savedLabel !== normalizedLabel)
+        ];
+        const data = await encryptLabels(key, updated);
         await storeVaultData(data);
+        // lock after save per ADR 0004
+        setVaultKey(null);
+        setSavedLabels([]);
+        setVaultStatus('locked');
+        setVaultSaved(true);
       }
-
-      // lock after save per ADR 0004
-      setVaultKey(null);
-      setSavedLabels([]);
-      setVaultStatus('locked');
-      setVaultSaved(true);
     } catch {
       // cancelled or failed
     } finally {
@@ -361,8 +396,8 @@ export function App(): JSX.Element {
   const showSaveToVault =
     isPersisted && vaultEnrolled && !selectedFromVault && !vaultSaved;
 
-  // ponytail: autoSaveNote shows after vault-selected label was derived
-  const autoSaveNote = isPersisted && selectedFromVault && vaultSaved;
+  // autoSaveNote: label came from vault, already saved — show confirmation in LabelScreen
+  const autoSaveNote = isPersisted && selectedFromVault;
 
   function screen(): JSX.Element {
     if (session === undefined) {

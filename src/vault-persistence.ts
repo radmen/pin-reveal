@@ -1,3 +1,5 @@
+import { idbGet, idbPut, idbClear } from './idb';
+
 const DATABASE_NAME = 'pinapp-vault';
 const STORE_NAME = 'vault';
 const CRED_KEY = 'cred';
@@ -21,54 +23,9 @@ export class VaultPersistenceError extends Error {
   }
 }
 
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, 1);
-    request.onupgradeneeded = (): void => {
-      request.result.createObjectStore(STORE_NAME);
-    };
-    request.onsuccess = (): void => resolve(request.result);
-    request.onerror = (): void => reject(request.error);
-  });
-}
-
-async function getItem<T>(key: string): Promise<T | null> {
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const request = database
-      .transaction(STORE_NAME, 'readonly')
-      .objectStore(STORE_NAME)
-      .get(key);
-    request.onsuccess = (): void => resolve((request.result as T) ?? null);
-    request.onerror = (): void => reject(request.error);
-  });
-}
-
-async function putItem(key: string, value: unknown): Promise<void> {
-  const database = await openDatabase();
-  await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).put(value, key);
-    transaction.oncomplete = (): void => resolve();
-    transaction.onabort = (): void => reject(transaction.error);
-    transaction.onerror = (): void => reject(transaction.error);
-  });
-}
-
-async function clearAll(): Promise<void> {
-  const database = await openDatabase();
-  await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).clear();
-    transaction.oncomplete = (): void => resolve();
-    transaction.onabort = (): void => reject(transaction.error);
-    transaction.onerror = (): void => reject(transaction.error);
-  });
-}
-
 export async function loadVaultCredential(): Promise<VaultCredential | null> {
   try {
-    return await getItem<VaultCredential>(CRED_KEY);
+    return await idbGet<VaultCredential>(DATABASE_NAME, STORE_NAME, CRED_KEY);
   } catch (cause) {
     throw new VaultPersistenceError('Failed to load Vault credential.', cause);
   }
@@ -78,7 +35,7 @@ export async function storeVaultCredential(
   credential: VaultCredential
 ): Promise<void> {
   try {
-    await putItem(CRED_KEY, credential);
+    await idbPut(DATABASE_NAME, STORE_NAME, CRED_KEY, credential);
   } catch (cause) {
     throw new VaultPersistenceError('Failed to store Vault credential.', cause);
   }
@@ -86,7 +43,11 @@ export async function storeVaultCredential(
 
 export async function loadVaultData(): Promise<VaultEncryptedData | null> {
   try {
-    return await getItem<VaultEncryptedData>(DATA_KEY);
+    return await idbGet<VaultEncryptedData>(
+      DATABASE_NAME,
+      STORE_NAME,
+      DATA_KEY
+    );
   } catch (cause) {
     throw new VaultPersistenceError('Failed to load Vault data.', cause);
   }
@@ -94,7 +55,7 @@ export async function loadVaultData(): Promise<VaultEncryptedData | null> {
 
 export async function storeVaultData(data: VaultEncryptedData): Promise<void> {
   try {
-    await putItem(DATA_KEY, data);
+    await idbPut(DATABASE_NAME, STORE_NAME, DATA_KEY, data);
   } catch (cause) {
     throw new VaultPersistenceError('Failed to store Vault data.', cause);
   }
@@ -102,13 +63,11 @@ export async function storeVaultData(data: VaultEncryptedData): Promise<void> {
 
 export async function forgetVault(): Promise<void> {
   try {
-    await clearAll();
+    await idbClear(DATABASE_NAME, STORE_NAME);
   } catch (cause) {
     throw new VaultPersistenceError('Failed to forget Vault.', cause);
   }
 }
-
-// ── Crypto helpers ──
 
 export async function deriveVaultKey(
   prfOutput: Uint8Array<ArrayBuffer>,
