@@ -20,6 +20,8 @@ import {
   checkPrfSupport,
   createVaultPasskey,
   getVaultPrfOutput,
+  type VaultPasskeyDiagnosticEvent,
+  type VaultPasskeyDiagnosticRecorder,
   VaultPasskeyCancelledError,
   VaultPasskeyError,
   VaultPasskeyNotSupportedError
@@ -39,7 +41,11 @@ import {
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
-import { VaultScreen, type VaultStatus } from './screens/VaultScreen';
+import {
+  VaultScreen,
+  type VaultDiagnosticItem,
+  type VaultStatus
+} from './screens/VaultScreen';
 import { normalizeLabel } from './derivation-contract';
 import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
 import styles from './App.module.css';
@@ -53,6 +59,216 @@ type UnlockedSession = {
 };
 
 const VAULT_UNLOCK_TIMEOUT_MS = 60_000;
+
+function findVaultDiagnosticsEnabled(): boolean {
+  if (import.meta.env.MODE !== 'production') {
+    return true;
+  }
+
+  try {
+    const searchParameters = new URLSearchParams(window.location.search);
+
+    return (
+      searchParameters.get('vault-debug') === '1' ||
+      localStorage.getItem('pinderive.vaultDebug') === 'true'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getVaultDiagnosticRuntimeDetails(): Record<string, unknown> {
+  return {
+    appMode: import.meta.env.MODE,
+    isSecureContext:
+      typeof window !== 'undefined' ? window.isSecureContext : null,
+    url: typeof window !== 'undefined' ? window.location.href : null,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+    hasPublicKeyCredential:
+      typeof window !== 'undefined' && !!window.PublicKeyCredential,
+    hasCredentialCreate:
+      typeof navigator !== 'undefined' && !!navigator.credentials?.create,
+    hasCredentialGet:
+      typeof navigator !== 'undefined' && !!navigator.credentials?.get,
+    hasClipboardWrite:
+      typeof navigator !== 'undefined' && !!navigator.clipboard?.writeText
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function findDiagnosticDetails(
+  events: VaultPasskeyDiagnosticEvent[],
+  step: string
+): unknown {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index].step === step) {
+      return events[index].details;
+    }
+  }
+
+  return null;
+}
+
+function findDiagnosticField(
+  events: VaultPasskeyDiagnosticEvent[],
+  step: string,
+  field: string
+): unknown {
+  const details = findDiagnosticDetails(events, step);
+
+  if (!isRecord(details)) {
+    return null;
+  }
+
+  return details[field] ?? null;
+}
+
+function formatDiagnosticValue(value: unknown): string {
+  if (value === null || typeof value === 'undefined') {
+    return 'not collected yet';
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'yes' : 'no';
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
+}
+
+function createVaultDiagnosticItems(
+  vaultStatus: VaultStatus,
+  events: VaultPasskeyDiagnosticEvent[]
+): VaultDiagnosticItem[] {
+  const runtimeDetails = getVaultDiagnosticRuntimeDetails();
+
+  return [
+    {
+      label: 'App mode',
+      value: formatDiagnosticValue(runtimeDetails.appMode)
+    },
+    {
+      label: 'Secure context',
+      value: formatDiagnosticValue(runtimeDetails.isSecureContext)
+    },
+    {
+      label: 'Current URL',
+      value: formatDiagnosticValue(runtimeDetails.url)
+    },
+    {
+      label: 'User agent',
+      value: formatDiagnosticValue(runtimeDetails.userAgent)
+    },
+    {
+      label: 'Vault status',
+      value: vaultStatus
+    },
+    {
+      label: 'PublicKeyCredential API',
+      value: formatDiagnosticValue(runtimeDetails.hasPublicKeyCredential)
+    },
+    {
+      label: 'Credential create API',
+      value: formatDiagnosticValue(runtimeDetails.hasCredentialCreate)
+    },
+    {
+      label: 'Credential get API',
+      value: formatDiagnosticValue(runtimeDetails.hasCredentialGet)
+    },
+    {
+      label: 'Client PRF capability',
+      value: formatDiagnosticValue(
+        findDiagnosticField(
+          events,
+          'support.client-capabilities',
+          'extension:prf'
+        )
+      )
+    },
+    {
+      label: 'Raw client capabilities',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'support.client-capabilities')
+      )
+    },
+    {
+      label: 'Platform authenticator available',
+      value: formatDiagnosticValue(
+        findDiagnosticField(
+          events,
+          'support.platform-authenticator',
+          'available'
+        )
+      )
+    },
+    {
+      label: 'Platform authenticator error',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'support.platform-authenticator-error')
+      )
+    },
+    {
+      label: 'Support check decision',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'support.result')
+      )
+    },
+    {
+      label: 'Create request options',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'create.request')
+      )
+    },
+    {
+      label: 'Create error',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'create.error')
+      )
+    },
+    {
+      label: 'Create extension results',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'create.extension-results')
+      )
+    },
+    {
+      label: 'Create decision',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'create.result')
+      )
+    },
+    {
+      label: 'Assertion request options',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'assertion.request')
+      )
+    },
+    {
+      label: 'Assertion error',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'assertion.error')
+      )
+    },
+    {
+      label: 'Assertion extension results',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'assertion.extension-results')
+      )
+    },
+    {
+      label: 'Assertion decision',
+      value: formatDiagnosticValue(
+        findDiagnosticDetails(events, 'assertion.result')
+      )
+    }
+  ];
+}
 
 function findStoredTheme(): Theme | null {
   try {
@@ -106,6 +322,13 @@ export function App(): JSX.Element {
   const [labelScreenKey, setLabelScreenKey] = useState(0);
   const [vaultSaved, setVaultSaved] = useState(false);
   const [vaultSaveBusy, setVaultSaveBusy] = useState(false);
+  const [vaultDiagnosticsEnabled] = useState(findVaultDiagnosticsEnabled);
+  const [vaultDiagnosticEvents, setVaultDiagnosticEvents] = useState<
+    VaultPasskeyDiagnosticEvent[]
+  >([]);
+  const [vaultDiagnosticCopyStatus, setVaultDiagnosticCopyStatus] = useState<
+    'idle' | 'copied' | 'failed'
+  >('idle');
 
   const vaultKeyRef = useRef<CryptoKey | null>(null);
   const savedLabelsRef = useRef<SavedLabel[]>([]);
@@ -160,7 +383,7 @@ export function App(): JSX.Element {
 
   async function initializeVaultStatus(): Promise<void> {
     try {
-      const supported = await checkPrfSupport();
+      const supported = await checkPrfSupport(findVaultDiagnosticRecorder());
       if (!supported) {
         setVaultStatus('unavailable');
         return;
@@ -190,7 +413,8 @@ export function App(): JSX.Element {
     }
     const prfOutput = await getVaultPrfOutput(
       credential.credentialId,
-      credential.prfSalt
+      credential.prfSalt,
+      findVaultDiagnosticRecorder()
     );
     const key = await deriveVaultKey(prfOutput, credential.prfSalt);
     const data = await loadVaultData();
@@ -257,6 +481,29 @@ export function App(): JSX.Element {
     setVaultSaved(false);
     setVaultSaveBusy(false);
     setVaultBusy(false);
+    setVaultDiagnosticEvents([]);
+    setVaultDiagnosticCopyStatus('idle');
+  }
+
+  function recordVaultDiagnosticEvent(
+    event: VaultPasskeyDiagnosticEvent
+  ): void {
+    setVaultDiagnosticEvents((events) => [...events, event].slice(-50));
+    setVaultDiagnosticCopyStatus('idle');
+  }
+
+  function findVaultDiagnosticRecorder():
+    VaultPasskeyDiagnosticRecorder | undefined {
+    return vaultDiagnosticsEnabled ? recordVaultDiagnosticEvent : undefined;
+  }
+
+  function resetVaultDiagnostics(): void {
+    if (!vaultDiagnosticsEnabled) {
+      return;
+    }
+
+    setVaultDiagnosticEvents([]);
+    setVaultDiagnosticCopyStatus('idle');
   }
 
   function lockVault(): void {
@@ -296,9 +543,12 @@ export function App(): JSX.Element {
   }
 
   async function handleEnableVault(): Promise<void> {
+    resetVaultDiagnostics();
     setVaultBusy(true);
     try {
-      const { credentialId, prfSalt, prfOutput } = await createVaultPasskey();
+      const { credentialId, prfSalt, prfOutput } = await createVaultPasskey(
+        findVaultDiagnosticRecorder()
+      );
       const key = await deriveVaultKey(prfOutput, prfSalt);
       const data = await encryptLabels(key, []);
       try {
@@ -328,6 +578,7 @@ export function App(): JSX.Element {
   }
 
   async function handleUnlockVault(): Promise<void> {
+    resetVaultDiagnostics();
     setVaultBusy(true);
     try {
       const { key, labels } = await performVaultUnlock();
@@ -432,6 +683,7 @@ export function App(): JSX.Element {
       return;
     }
 
+    resetVaultDiagnostics();
     setVaultSaveBusy(true);
     try {
       let key: CryptoKey;
@@ -478,6 +730,29 @@ export function App(): JSX.Element {
   const showSaveToVault =
     isPersisted && vaultEnrolled && !selectedFromVault && !vaultSaved;
 
+  const vaultDiagnosticReport = vaultDiagnosticsEnabled
+    ? JSON.stringify(
+        {
+          runtime: getVaultDiagnosticRuntimeDetails(),
+          vaultStatus,
+          events: vaultDiagnosticEvents
+        },
+        null,
+        2
+      )
+    : null;
+  const vaultDiagnosticItems = vaultDiagnosticsEnabled
+    ? createVaultDiagnosticItems(vaultStatus, vaultDiagnosticEvents)
+    : [];
+  const vaultDiagnosticRunLabel =
+    vaultStatus === 'locked' || vaultStatus === 'unlocked'
+      ? 'Run unlock check'
+      : 'Try enabling Vault';
+  const runVaultDiagnostics =
+    vaultStatus === 'locked' || vaultStatus === 'unlocked'
+      ? handleUnlockVault
+      : handleEnableVault;
+
   // autoSaveNote: label came from vault, already saved — show confirmation in LabelScreen
   const autoSaveNote = isPersisted && selectedFromVault;
 
@@ -496,12 +771,21 @@ export function App(): JSX.Element {
           status={vaultStatus}
           isBusy={vaultBusy}
           savedLabels={savedLabels}
+          diagnosticsEnabled={vaultDiagnosticsEnabled}
+          diagnosticItems={vaultDiagnosticItems}
+          diagnosticReport={vaultDiagnosticReport}
+          diagnosticCopyStatus={vaultDiagnosticCopyStatus}
+          diagnosticRunLabel={vaultDiagnosticRunLabel}
           onEnable={handleEnableVault}
           onUnlock={handleUnlockVault}
           onLock={handleLockVault}
           onDisable={handleDisableVault}
           onSelectLabel={handleSelectLabel}
           onRemoveLabel={handleRemoveLabel}
+          onCopyDiagnostics={handleCopyVaultDiagnostics}
+          onRunDiagnostics={
+            vaultDiagnosticsEnabled ? runVaultDiagnostics : undefined
+          }
           onExit={() => setShowVault(false)}
         />
       );
@@ -538,6 +822,20 @@ export function App(): JSX.Element {
         onSaveToVault={handleSaveToVault}
       />
     );
+  }
+
+  async function handleCopyVaultDiagnostics(): Promise<void> {
+    if (!vaultDiagnosticReport || !navigator.clipboard?.writeText) {
+      setVaultDiagnosticCopyStatus('failed');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(vaultDiagnosticReport);
+      setVaultDiagnosticCopyStatus('copied');
+    } catch {
+      setVaultDiagnosticCopyStatus('failed');
+    }
   }
 
   return (

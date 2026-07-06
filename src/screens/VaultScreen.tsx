@@ -5,18 +5,142 @@ import type { SavedLabel } from '../vault-persistence';
 import styles from './VaultScreen.module.css';
 
 export type VaultStatus = 'unavailable' | 'unenrolled' | 'locked' | 'unlocked';
+export type VaultDiagnosticItem = {
+  label: string;
+  value: string;
+};
+
+type VaultDiagnosticCopyStatus = 'idle' | 'copied' | 'failed';
 
 interface VaultScreenProps {
   status: VaultStatus;
   isBusy: boolean;
   savedLabels: SavedLabel[];
+  diagnosticsEnabled: boolean;
+  diagnosticItems: VaultDiagnosticItem[];
+  diagnosticReport: string | null;
+  diagnosticCopyStatus: VaultDiagnosticCopyStatus;
+  diagnosticRunLabel: string;
   onEnable(): void;
   onUnlock(): void;
   onLock(): void;
   onDisable(): void;
   onSelectLabel(label: SavedLabel): void;
   onRemoveLabel(label: SavedLabel): void;
+  onCopyDiagnostics(): void;
+  onRunDiagnostics?(): void;
   onExit(): void;
+}
+
+function VaultHeader({
+  title,
+  onBack,
+  diagnosticsEnabled,
+  onOpenDiagnostics
+}: {
+  title: string;
+  onBack(): void;
+  diagnosticsEnabled?: boolean;
+  onOpenDiagnostics?: () => void;
+}): JSX.Element {
+  return (
+    <div className={styles.header}>
+      <button type="button" onClick={onBack} className={styles.backButton}>
+        ←
+      </button>
+      <span className={styles.vaultTitle}>{title}</span>
+      {diagnosticsEnabled && onOpenDiagnostics ? (
+        <button
+          type="button"
+          onClick={onOpenDiagnostics}
+          className={styles.headerAction}
+        >
+          Diagnostics
+        </button>
+      ) : (
+        <span className={styles.headerSpacer} />
+      )}
+    </div>
+  );
+}
+
+function VaultDiagnosticsScreen({
+  isBusy,
+  diagnosticItems,
+  diagnosticReport,
+  diagnosticCopyStatus,
+  diagnosticRunLabel,
+  onRunDiagnostics,
+  onCopyDiagnostics,
+  onBack
+}: {
+  isBusy: boolean;
+  diagnosticItems: VaultDiagnosticItem[];
+  diagnosticReport: string | null;
+  diagnosticCopyStatus: VaultDiagnosticCopyStatus;
+  diagnosticRunLabel: string;
+  onRunDiagnostics?: () => void;
+  onCopyDiagnostics(): void;
+  onBack(): void;
+}): JSX.Element {
+  return (
+    <div className={styles.screen}>
+      <VaultHeader title="Diagnostics" onBack={onBack} />
+
+      <div className={styles.diagnosticsView}>
+        <div className={styles.diagnosticsIntro}>
+          <h2 className={styles.stateHeading}>Vault diagnostics</h2>
+          <p className={styles.stateText}>
+            This lists the browser, WebAuthn, passkey PRF, and Vault runtime
+            details needed to troubleshoot mobile support. Buffer values are
+            summarized by byte length, not printed as secrets.
+          </p>
+        </div>
+
+        <PrimaryButton
+          disabled={isBusy || !onRunDiagnostics}
+          onClick={onRunDiagnostics}
+        >
+          {isBusy ? 'Running diagnostics…' : diagnosticRunLabel}
+        </PrimaryButton>
+        <span className={styles.diagnosticsHint}>
+          This uses the real Vault enable or unlock flow. If enabling succeeds,
+          the Vault stays enabled.
+        </span>
+
+        <div className={styles.diagnosticList}>
+          {diagnosticItems.map((item) => (
+            <div key={item.label} className={styles.diagnosticRow}>
+              <span className={styles.diagnosticLabel}>{item.label}</span>
+              <code className={styles.diagnosticValue}>{item.value}</code>
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.diagnosticActions}>
+          <button
+            type="button"
+            className={styles.copyButton}
+            disabled={!diagnosticReport}
+            onClick={onCopyDiagnostics}
+          >
+            Copy report
+          </button>
+          {diagnosticCopyStatus === 'copied' && (
+            <span className={styles.copyStatus}>Copied.</span>
+          )}
+          {diagnosticCopyStatus === 'failed' && (
+            <span className={styles.copyStatus}>Copy failed.</span>
+          )}
+        </div>
+
+        <details className={styles.rawReport}>
+          <summary>Raw report</summary>
+          <pre>{diagnosticReport ?? 'Diagnostics are not available.'}</pre>
+        </details>
+      </div>
+    </div>
+  );
 }
 
 function FingerprintIcon({
@@ -110,23 +234,46 @@ export function VaultScreen({
   status,
   isBusy,
   savedLabels,
+  diagnosticsEnabled,
+  diagnosticItems,
+  diagnosticReport,
+  diagnosticCopyStatus,
+  diagnosticRunLabel,
   onEnable,
   onUnlock,
   onLock,
   onDisable,
   onSelectLabel,
   onRemoveLabel,
+  onCopyDiagnostics,
+  onRunDiagnostics,
   onExit
 }: VaultScreenProps): JSX.Element {
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+  if (showDiagnostics) {
+    return (
+      <VaultDiagnosticsScreen
+        isBusy={isBusy}
+        diagnosticItems={diagnosticItems}
+        diagnosticReport={diagnosticReport}
+        diagnosticCopyStatus={diagnosticCopyStatus}
+        diagnosticRunLabel={diagnosticRunLabel}
+        onRunDiagnostics={onRunDiagnostics}
+        onCopyDiagnostics={onCopyDiagnostics}
+        onBack={() => setShowDiagnostics(false)}
+      />
+    );
+  }
+
   return (
     <div className={styles.screen}>
-      <div className={styles.header}>
-        <button type="button" onClick={onExit} className={styles.backButton}>
-          ←
-        </button>
-        <span className={styles.vaultTitle}>Vault</span>
-        <span className={styles.headerSpacer} />
-      </div>
+      <VaultHeader
+        title="Vault"
+        onBack={onExit}
+        diagnosticsEnabled={diagnosticsEnabled}
+        onOpenDiagnostics={() => setShowDiagnostics(true)}
+      />
 
       {status === 'unavailable' && (
         <div className={styles.stateView}>
@@ -139,6 +286,15 @@ export function VaultScreen({
               There's no weaker fallback — Saved Labels stay off here.
             </p>
           </div>
+          {diagnosticsEnabled && (
+            <button
+              type="button"
+              onClick={() => setShowDiagnostics(true)}
+              className={styles.secondaryButton}
+            >
+              Open diagnostics
+            </button>
+          )}
         </div>
       )}
 

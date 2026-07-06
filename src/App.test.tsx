@@ -624,6 +624,98 @@ describe('App — Vault', (): void => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows a vault diagnostics checklist with support probe details', async (): Promise<void> => {
+    mockedLoadMasterKey.mockResolvedValue(await createKey());
+    mockedCheckPrfSupport.mockImplementation(async (recordDiagnostic) => {
+      recordDiagnostic?.({
+        step: 'support.client-capabilities',
+        details: { 'extension:prf': false }
+      });
+      recordDiagnostic?.({
+        step: 'support.platform-authenticator',
+        details: { available: true }
+      });
+      recordDiagnostic?.({
+        step: 'support.result',
+        details: {
+          supported: false,
+          reason: 'client-capability-extension-prf'
+        }
+      });
+
+      return false;
+    });
+
+    render(<App />);
+    await screen.findByRole('heading', { name: /new pin/i });
+
+    fireEvent.click(await screen.findByRole('button', { name: /vault/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /open diagnostics/i })
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: /vault diagnostics/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Client PRF capability')).toBeInTheDocument();
+    expect(
+      screen.getByText('Platform authenticator available')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Create extension results')).toBeInTheDocument();
+    expect(screen.getByText('Assertion extension results')).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/client-capability-extension-prf/i).length
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /copy report/i })).toBeEnabled();
+  });
+
+  it('runs the real vault enable flow from diagnostics', async (): Promise<void> => {
+    mockedLoadMasterKey.mockResolvedValue(await createKey());
+    mockedCheckPrfSupport.mockResolvedValue(false);
+    mockedCreateVaultPasskey.mockImplementation(async (recordDiagnostic) => {
+      recordDiagnostic?.({
+        step: 'create.request',
+        details: {
+          authenticatorAttachment: 'platform',
+          residentKey: 'discouraged',
+          userVerification: 'required',
+          hasPrfEval: true
+        }
+      });
+      recordDiagnostic?.({
+        step: 'create.extension-results',
+        details: { prf: { results: { first: { byteLength: 32 } } } }
+      });
+      recordDiagnostic?.({
+        step: 'create.result',
+        details: {
+          supported: true,
+          reason: 'create-prf-output',
+          prfOutputByteLength: 32
+        }
+      });
+
+      return fakePasskeyCreation;
+    });
+
+    render(<App />);
+    await screen.findByRole('heading', { name: /new pin/i });
+
+    fireEvent.click(await screen.findByRole('button', { name: /vault/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /open diagnostics/i })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /try enabling vault/i })
+    );
+
+    await waitFor((): void => {
+      expect(mockedStoreVaultCredential).toHaveBeenCalledOnce();
+    });
+    expect(mockedCreateVaultPasskey).toHaveBeenCalledOnce();
+    expect(screen.getAllByText(/create-prf-output/i).length).toBeGreaterThan(0);
+  });
+
   it('shows vault unenrolled state when PRF is supported but vault is not set up', async (): Promise<void> => {
     mockedLoadMasterKey.mockResolvedValue(await createKey());
     mockedCheckPrfSupport.mockResolvedValue(true);
