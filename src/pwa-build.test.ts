@@ -30,6 +30,17 @@ function buildProductionApp(): void {
   });
 }
 
+function buildDevelopmentApp(): void {
+  execFileSync(
+    'npx',
+    ['vite', 'build', '--mode', 'development', '--emptyOutDir'],
+    {
+      cwd: projectRoot,
+      stdio: 'pipe'
+    }
+  );
+}
+
 function readDistFile(relativePath: string): string {
   return readFileSync(join(distPath, relativePath), 'utf8');
 }
@@ -84,6 +95,20 @@ function assertServiceWorkerRegistration(
       fileName.startsWith('workbox-')
     )
   ).toBe(true);
+}
+
+function assertSelfDestroyingServiceWorker(): void {
+  const serviceWorker = readDistFile('sw.js');
+
+  expect(serviceWorker).toContain('self.registration.unregister()');
+  expect(serviceWorker).toContain('self.caches.delete(cacheName)');
+  expect(serviceWorker).not.toContain('precacheAndRoute');
+  expect(readPrecacheUrls()).toEqual([]);
+  expect(
+    readdirSync(distPath).some((fileName: string): boolean =>
+      fileName.startsWith('workbox-')
+    )
+  ).toBe(false);
 }
 
 function assertInstallIcons(manifest: WebManifest): void {
@@ -247,5 +272,11 @@ describe('production PWA build artifacts', (): void => {
     assertCssModuleClassNamesAreOpaque();
     assertOfflineAppShellAssets(manifest);
     assertFingerprintWordListIsBundled();
+  });
+
+  it('emits a self-destroying service worker for development builds', (): void => {
+    buildDevelopmentApp();
+
+    assertSelfDestroyingServiceWorker();
   });
 });
