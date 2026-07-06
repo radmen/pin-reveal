@@ -120,6 +120,29 @@ describe('vault passkey adapter', (): void => {
       expect(result.prfOutput).toEqual(new Uint8Array(fakePrfOutput));
     });
 
+    it('requests a discoverable platform credential for PRF support', async (): Promise<void> => {
+      const credential = makeFakeCredential();
+      const create = vi.fn(() => Promise.resolve(credential));
+      installFakeWebAuthn({ create });
+
+      await createVaultPasskey();
+
+      expect(create).toHaveBeenCalledWith({
+        publicKey: expect.objectContaining({
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            residentKey: 'required',
+            requireResidentKey: true
+          },
+          extensions: {
+            credProps: true,
+            prf: { eval: { first: expect.any(Uint8Array) } }
+          }
+        })
+      });
+    });
+
     it('falls back to assertion when credential creation enables PRF without results', async (): Promise<void> => {
       const credential = makeFakeCredential({ prf: { enabled: true } });
       const assertion = makeFakeCredential();

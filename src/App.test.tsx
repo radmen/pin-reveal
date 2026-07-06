@@ -677,8 +677,10 @@ describe('App — Vault', (): void => {
         step: 'create.request',
         details: {
           authenticatorAttachment: 'platform',
-          residentKey: 'discouraged',
+          residentKey: 'required',
+          requireResidentKey: true,
           userVerification: 'required',
+          hasCredProps: true,
           hasPrfEval: true
         }
       });

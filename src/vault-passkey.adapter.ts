@@ -35,6 +35,9 @@ export type VaultPasskeyDiagnosticRecorder = (
 ) => void;
 
 type PrfExtensionResults = {
+  credProps?: {
+    rk?: boolean;
+  };
   prf?: {
     enabled?: boolean;
     results?: {
@@ -282,8 +285,10 @@ export async function createVaultPasskey(
   try {
     recordDiagnosticEvent(recordDiagnostic, 'create.request', {
       authenticatorAttachment: 'platform',
-      residentKey: 'discouraged',
+      residentKey: 'required',
+      requireResidentKey: true,
       userVerification: 'required',
+      hasCredProps: true,
       hasPrfEval: true
     });
 
@@ -303,9 +308,11 @@ export async function createVaultPasskey(
         authenticatorSelection: {
           authenticatorAttachment: 'platform',
           userVerification: 'required',
-          residentKey: 'discouraged'
+          residentKey: 'required',
+          requireResidentKey: true
         },
         extensions: {
+          credProps: true,
           prf: { eval: { first: prfSalt } }
         } as AuthenticationExtensionsClientInputs,
         timeout: 60000
