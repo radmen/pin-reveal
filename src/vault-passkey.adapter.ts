@@ -25,6 +25,15 @@ export type VaultPasskeyCreation = {
   prfOutput: Uint8Array<ArrayBuffer>;
 };
 
+type PrfExtensionResults = {
+  prf?: {
+    enabled?: boolean;
+    results?: {
+      first?: ArrayBuffer;
+    };
+  };
+};
+
 function isWebAuthnCancelError(error: unknown): boolean {
   return error instanceof Error && error.name === 'NotAllowedError';
 }
@@ -55,8 +64,8 @@ export async function checkPrfSupport(): Promise<boolean> {
     if (publicKeyCredential.getClientCapabilities) {
       const capabilities = await publicKeyCredential.getClientCapabilities();
 
-      if (typeof capabilities['prf'] === 'boolean') {
-        return capabilities['prf'];
+      if (typeof capabilities['extension:prf'] === 'boolean') {
+        return capabilities['extension:prf'];
       }
     }
 
@@ -124,20 +133,41 @@ export async function createVaultPasskey(): Promise<VaultPasskeyCreation> {
     throw new VaultPasskeyError(new Error('No credential returned.'));
   }
 
-  const extensionResults = credential.getClientExtensionResults() as {
-    prf?: { results?: { first?: ArrayBuffer } };
-  };
+  const credentialId = new Uint8Array(credential.rawId);
+  const extensionResults =
+    credential.getClientExtensionResults() as PrfExtensionResults;
   const rawOutput = extensionResults.prf?.results?.first;
 
-  if (!rawOutput) {
+  if (rawOutput) {
+    return {
+      credentialId,
+      prfSalt,
+      prfOutput: new Uint8Array(rawOutput)
+    };
+  }
+
+  if (!extensionResults.prf?.enabled) {
     throw new VaultPasskeyNotSupportedError();
   }
 
+  const prfOutput = await getVaultPrfOutput(credentialId, prfSalt);
+
   return {
-    credentialId: new Uint8Array(credential.rawId),
+    credentialId,
     prfSalt,
-    prfOutput: new Uint8Array(rawOutput)
+    prfOutput
   };
+}
+
+function toBase64Url(bytes: Uint8Array<ArrayBuffer>): string {
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join(
+    ''
+  );
+
+  return btoa(binary)
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/u, '');
 }
 
 export async function getVaultPrfOutput(
@@ -160,7 +190,11 @@ export async function getVaultPrfOutput(
         allowCredentials: [{ type: 'public-key', id: credentialId }],
         userVerification: 'required',
         extensions: {
-          prf: { eval: { first: prfSalt } }
+          prf: {
+            evalByCredential: {
+              [toBase64Url(credentialId)]: { first: prfSalt }
+            }
+          }
         } as AuthenticationExtensionsClientInputs,
         timeout: 60000
       }
@@ -182,9 +216,8 @@ export async function getVaultPrfOutput(
     throw new VaultPasskeyError(new Error('No assertion returned.'));
   }
 
-  const extensionResults = assertion.getClientExtensionResults() as {
-    prf?: { results?: { first?: ArrayBuffer } };
-  };
+  const extensionResults =
+    assertion.getClientExtensionResults() as PrfExtensionResults;
   const rawOutput = extensionResults.prf?.results?.first;
 
   if (!rawOutput) {

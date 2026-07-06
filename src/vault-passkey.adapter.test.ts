@@ -11,13 +11,12 @@ import {
 const fakePrfOutput = new Uint8Array(32).fill(42).buffer;
 const fakeRawId = new Uint8Array(16).fill(1).buffer;
 
-// ponytail: explicit noPrf sentinel avoids the JS default-parameter gotcha where
-// makeFakeCredential() would still trigger the default value.
-function makeFakeCredential(prfFirst?: ArrayBuffer): PublicKeyCredential {
+function makeFakeCredential(
+  extensionResults: object = { prf: { results: { first: fakePrfOutput } } }
+): PublicKeyCredential {
   return {
     rawId: fakeRawId,
-    getClientExtensionResults: (): object =>
-      prfFirst !== undefined ? { prf: { results: { first: prfFirst } } } : {}
+    getClientExtensionResults: (): object => extensionResults
   } as unknown as PublicKeyCredential;
 }
 
@@ -73,9 +72,9 @@ describe('vault passkey adapter', (): void => {
       await expect(checkPrfSupport()).resolves.toBe(false);
     });
 
-    it('uses getClientCapabilities when available and returns its prf flag', async (): Promise<void> => {
+    it('uses getClientCapabilities when available and returns its PRF extension flag', async (): Promise<void> => {
       installFakeWebAuthn({
-        getClientCapabilities: () => Promise.resolve({ prf: true })
+        getClientCapabilities: () => Promise.resolve({ 'extension:prf': true })
       });
 
       await expect(checkPrfSupport()).resolves.toBe(true);
@@ -83,7 +82,7 @@ describe('vault passkey adapter', (): void => {
 
     it('returns false when getClientCapabilities reports no PRF support', async (): Promise<void> => {
       installFakeWebAuthn({
-        getClientCapabilities: () => Promise.resolve({ prf: false })
+        getClientCapabilities: () => Promise.resolve({ 'extension:prf': false })
       });
 
       await expect(checkPrfSupport()).resolves.toBe(false);
@@ -110,7 +109,7 @@ describe('vault passkey adapter', (): void => {
 
   describe('createVaultPasskey', (): void => {
     it('returns credentialId, prfSalt, and prfOutput on success', async (): Promise<void> => {
-      const credential = makeFakeCredential(fakePrfOutput);
+      const credential = makeFakeCredential();
       installFakeWebAuthn({ create: () => Promise.resolve(credential) });
 
       const result = await createVaultPasskey();
@@ -121,8 +120,26 @@ describe('vault passkey adapter', (): void => {
       expect(result.prfOutput).toEqual(new Uint8Array(fakePrfOutput));
     });
 
+    it('falls back to assertion when credential creation enables PRF without results', async (): Promise<void> => {
+      const credential = makeFakeCredential({ prf: { enabled: true } });
+      const assertion = makeFakeCredential();
+      const get = vi.fn(() => Promise.resolve(assertion));
+      installFakeWebAuthn({
+        create: () => Promise.resolve(credential),
+        get
+      });
+
+      const result = await createVaultPasskey();
+
+      expect(result.credentialId).toEqual(new Uint8Array(fakeRawId));
+      expect(result.prfSalt).toBeInstanceOf(Uint8Array);
+      expect(result.prfSalt.length).toBe(32);
+      expect(result.prfOutput).toEqual(new Uint8Array(fakePrfOutput));
+      expect(get).toHaveBeenCalledOnce();
+    });
+
     it('throws VaultPasskeyNotSupportedError when PRF results are absent', async (): Promise<void> => {
-      const credential = makeFakeCredential();
+      const credential = makeFakeCredential({});
       installFakeWebAuthn({ create: () => Promise.resolve(credential) });
 
       await expect(createVaultPasskey()).rejects.toBeInstanceOf(
@@ -187,7 +204,7 @@ describe('vault passkey adapter', (): void => {
 
   describe('getVaultPrfOutput', (): void => {
     it('returns PRF output on successful assertion', async (): Promise<void> => {
-      const assertion = makeFakeCredential(fakePrfOutput);
+      const assertion = makeFakeCredential();
       installFakeWebAuthn({ get: () => Promise.resolve(assertion) });
 
       const credentialId = new Uint8Array(16).fill(5);
@@ -197,8 +214,31 @@ describe('vault passkey adapter', (): void => {
       expect(result).toEqual(new Uint8Array(fakePrfOutput));
     });
 
-    it('throws VaultPasskeyNotSupportedError when PRF results are absent', async (): Promise<void> => {
+    it('requests assertion PRF with evalByCredential', async (): Promise<void> => {
       const assertion = makeFakeCredential();
+      const get = vi.fn(() => Promise.resolve(assertion));
+      installFakeWebAuthn({ get });
+
+      const credentialId = new Uint8Array([251, 255]);
+      const prfSalt = new Uint8Array(32).fill(7);
+      await getVaultPrfOutput(credentialId, prfSalt);
+
+      expect(get).toHaveBeenCalledWith({
+        publicKey: expect.objectContaining({
+          allowCredentials: [{ type: 'public-key', id: credentialId }],
+          extensions: {
+            prf: {
+              evalByCredential: {
+                '-_8': { first: prfSalt }
+              }
+            }
+          }
+        })
+      });
+    });
+
+    it('throws VaultPasskeyNotSupportedError when PRF results are absent', async (): Promise<void> => {
+      const assertion = makeFakeCredential({});
       installFakeWebAuthn({ get: () => Promise.resolve(assertion) });
 
       await expect(
