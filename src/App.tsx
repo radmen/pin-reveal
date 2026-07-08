@@ -79,10 +79,6 @@ export function App(): JSX.Element {
     flow.origin !== 'vault' &&
     !vault.isSaved;
 
-  // autoSaveNote: label came from vault, already saved — show confirmation in LabelScreen
-  const autoSaveNote =
-    isPersisted && flow.route === 'label' && flow.origin === 'vault';
-
   function screen(): JSX.Element {
     if (session === undefined) {
       return <Splash />;
@@ -124,7 +120,6 @@ export function App(): JSX.Element {
           initialPinLength={flow.initialPinLength}
           sessionOutcome={session.outcome}
           vaultStatus={vault.status}
-          autoSaveNote={autoSaveNote}
           onProceed={handleLabelProceed}
           onOpenVault={() => dispatchFlow({ type: 'openVault' })}
         />

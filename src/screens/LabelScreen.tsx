@@ -46,7 +46,6 @@ interface LabelScreenProps {
   initialPinLength?: number;
   sessionOutcome: 'persisted' | 'in-memory';
   vaultStatus: VaultStatus;
-  autoSaveNote: boolean;
   onProceed(pin: string, label: string): void;
   onOpenVault(): void;
 }
@@ -69,7 +68,6 @@ export function LabelScreen({
   initialPinLength = 4,
   sessionOutcome,
   vaultStatus,
-  autoSaveNote,
   onProceed,
   onOpenVault
 }: LabelScreenProps): JSX.Element {
@@ -226,9 +224,6 @@ export function LabelScreen({
           <div className={styles.result}>
             <div className={styles.fingerprint}>{state.fingerprint}</div>
             <div className={styles.hint}>PIN ready — proceed to reveal it.</div>
-            {autoSaveNote && (
-              <div className={styles.savedNote}>✓ Saved to Vault</div>
-            )}
           </div>
         )}
         {state.kind === 'idle' && (
