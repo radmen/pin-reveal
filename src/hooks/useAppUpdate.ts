@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
+import { type ApplyAppUpdate, subscribeToAppUpdate } from '../pwa-update';
 
 export function useAppUpdate(): ApplyAppUpdate | null {
   const [applyAppUpdate, setApplyAppUpdate] = useState<ApplyAppUpdate | null>(

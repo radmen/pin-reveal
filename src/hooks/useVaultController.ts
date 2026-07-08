@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { normalizeLabel } from './derivation-contract';
+import { normalizeLabel } from '../derivation-contract';
 import {
   checkPrfSupport,
   createVaultPasskey,
@@ -7,7 +7,7 @@ import {
   VaultPasskeyCancelledError,
   VaultPasskeyError,
   VaultPasskeyNotSupportedError
-} from './vault-passkey.adapter';
+} from '../vault-passkey.adapter';
 import {
   decryptLabels,
   deriveVaultKey,
@@ -18,13 +18,13 @@ import {
   storeVaultCredential,
   storeVaultData,
   VaultPersistenceError
-} from './vault-persistence';
+} from '../vault-persistence';
 import type {
   SavedLabel,
   VaultPasskeyDiagnosticEvent,
   VaultPasskeyDiagnosticRecorder,
   VaultStatus
-} from './vault-types';
+} from '../vault-types';
 
 type UnlockedVault = {
   key: CryptoKey;

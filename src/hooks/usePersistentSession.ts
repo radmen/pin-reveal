@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { KeyPersistenceError } from './components/KeyPersistenceWarningBanner';
+import type { KeyPersistenceError } from '../components/KeyPersistenceWarningBanner';
 import {
   ForgetKeyError,
   forgetMasterKey,
@@ -7,8 +7,8 @@ import {
   loadMasterKey,
   StoreKeyError,
   storeMasterKey
-} from './key-persistence';
-import { forgetVault } from './vault-persistence';
+} from '../key-persistence';
+import { forgetVault } from '../vault-persistence';
 
 export type SessionOutcome = 'persisted' | 'in-memory';
 

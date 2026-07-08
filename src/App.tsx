@@ -10,10 +10,10 @@ import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
 import { VaultScreen } from './screens/VaultScreen';
 import { flowReducer, initialFlowState, labelCameFromVault } from './app-flow';
-import { useAppUpdate } from './useAppUpdate';
-import { usePersistentSession } from './usePersistentSession';
-import { useThemePreference } from './useThemePreference';
-import { useVaultController } from './useVaultController';
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { usePersistentSession } from './hooks/usePersistentSession';
+import { useThemePreference } from './hooks/useThemePreference';
+import { useVaultController } from './hooks/useVaultController';
 import type { SavedLabel } from './vault-types';
 import styles from './App.module.css';
 
