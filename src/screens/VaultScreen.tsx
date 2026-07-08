@@ -1,25 +1,19 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { PrimaryButton } from '../components/PrimaryButton';
+import type { VaultPasskeyDiagnosticEvent } from '../vault-passkey.adapter';
 import type { SavedLabel } from '../vault-persistence';
+import { VaultInspectorScreen } from './VaultInspectorScreen';
 import styles from './VaultScreen.module.css';
 
 export type VaultStatus = 'unavailable' | 'unenrolled' | 'locked' | 'unlocked';
-export type VaultDiagnosticItem = {
-  label: string;
-  value: string;
-};
-
-type VaultDiagnosticCopyStatus = 'idle' | 'copied' | 'failed';
 
 interface VaultScreenProps {
   status: VaultStatus;
   isBusy: boolean;
   savedLabels: SavedLabel[];
   diagnosticsEnabled: boolean;
-  diagnosticItems: VaultDiagnosticItem[];
-  diagnosticReport: string | null;
-  diagnosticCopyStatus: VaultDiagnosticCopyStatus;
+  diagnosticEvents: VaultPasskeyDiagnosticEvent[];
   diagnosticRunLabel: string;
   onEnable(): void;
   onUnlock(): void;
@@ -27,7 +21,6 @@ interface VaultScreenProps {
   onDisable(): void;
   onSelectLabel(label: SavedLabel): void;
   onRemoveLabel(label: SavedLabel): void;
-  onCopyDiagnostics(): void;
   onRunDiagnostics?(): void;
   onExit(): void;
 }
@@ -60,85 +53,6 @@ function VaultHeader({
       ) : (
         <span className={styles.headerSpacer} />
       )}
-    </div>
-  );
-}
-
-function VaultDiagnosticsScreen({
-  isBusy,
-  diagnosticItems,
-  diagnosticReport,
-  diagnosticCopyStatus,
-  diagnosticRunLabel,
-  onRunDiagnostics,
-  onCopyDiagnostics,
-  onBack
-}: {
-  isBusy: boolean;
-  diagnosticItems: VaultDiagnosticItem[];
-  diagnosticReport: string | null;
-  diagnosticCopyStatus: VaultDiagnosticCopyStatus;
-  diagnosticRunLabel: string;
-  onRunDiagnostics?: () => void;
-  onCopyDiagnostics(): void;
-  onBack(): void;
-}): JSX.Element {
-  return (
-    <div className={styles.screen}>
-      <VaultHeader title="Diagnostics" onBack={onBack} />
-
-      <div className={styles.diagnosticsView}>
-        <div className={styles.diagnosticsIntro}>
-          <h2 className={styles.stateHeading}>Vault diagnostics</h2>
-          <p className={styles.stateText}>
-            This lists the browser, WebAuthn, passkey PRF, and Vault runtime
-            details needed to troubleshoot mobile support. Buffer values are
-            summarized by byte length, not printed as secrets.
-          </p>
-        </div>
-
-        <PrimaryButton
-          disabled={isBusy || !onRunDiagnostics}
-          onClick={onRunDiagnostics}
-        >
-          {isBusy ? 'Running diagnostics…' : diagnosticRunLabel}
-        </PrimaryButton>
-        <span className={styles.diagnosticsHint}>
-          This uses the real Vault enable or unlock flow. If enabling succeeds,
-          the Vault stays enabled.
-        </span>
-
-        <div className={styles.diagnosticList}>
-          {diagnosticItems.map((item) => (
-            <div key={item.label} className={styles.diagnosticRow}>
-              <span className={styles.diagnosticLabel}>{item.label}</span>
-              <code className={styles.diagnosticValue}>{item.value}</code>
-            </div>
-          ))}
-        </div>
-
-        <div className={styles.diagnosticActions}>
-          <button
-            type="button"
-            className={styles.copyButton}
-            disabled={!diagnosticReport}
-            onClick={onCopyDiagnostics}
-          >
-            Copy report
-          </button>
-          {diagnosticCopyStatus === 'copied' && (
-            <span className={styles.copyStatus}>Copied.</span>
-          )}
-          {diagnosticCopyStatus === 'failed' && (
-            <span className={styles.copyStatus}>Copy failed.</span>
-          )}
-        </div>
-
-        <details className={styles.rawReport}>
-          <summary>Raw report</summary>
-          <pre>{diagnosticReport ?? 'Diagnostics are not available.'}</pre>
-        </details>
-      </div>
     </div>
   );
 }
@@ -235,9 +149,7 @@ export function VaultScreen({
   isBusy,
   savedLabels,
   diagnosticsEnabled,
-  diagnosticItems,
-  diagnosticReport,
-  diagnosticCopyStatus,
+  diagnosticEvents,
   diagnosticRunLabel,
   onEnable,
   onUnlock,
@@ -245,7 +157,6 @@ export function VaultScreen({
   onDisable,
   onSelectLabel,
   onRemoveLabel,
-  onCopyDiagnostics,
   onRunDiagnostics,
   onExit
 }: VaultScreenProps): JSX.Element {
@@ -253,14 +164,12 @@ export function VaultScreen({
 
   if (showDiagnostics) {
     return (
-      <VaultDiagnosticsScreen
+      <VaultInspectorScreen
+        status={status}
         isBusy={isBusy}
-        diagnosticItems={diagnosticItems}
-        diagnosticReport={diagnosticReport}
-        diagnosticCopyStatus={diagnosticCopyStatus}
-        diagnosticRunLabel={diagnosticRunLabel}
+        events={diagnosticEvents}
+        runLabel={diagnosticRunLabel}
         onRunDiagnostics={onRunDiagnostics}
-        onCopyDiagnostics={onCopyDiagnostics}
         onBack={() => setShowDiagnostics(false)}
       />
     );
