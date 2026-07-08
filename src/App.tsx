@@ -48,8 +48,14 @@ export function App(): JSX.Element {
   }
 
   function handleLabelProceed(pin: string, label: string): void {
-    const shouldSaveUnlockedLabel = labelCameFromVault(flow, label);
-    dispatchFlow({ type: 'showReveal', pin, label });
+    const shouldSaveUnlockedLabel =
+      labelCameFromVault(flow, label) && vault.status === 'unlocked';
+    dispatchFlow({
+      type: 'showReveal',
+      pin,
+      label,
+      origin: shouldSaveUnlockedLabel ? 'vault' : 'manual'
+    });
     vault.clearSavedState();
     if (shouldSaveUnlockedLabel) {
       void vault.saveUnlockedLabel(label, pin.length);
@@ -115,6 +121,7 @@ export function App(): JSX.Element {
           key={flow.labelVersion}
           masterKey={session.key}
           initialLabel={flow.initialLabel}
+          initialPinLength={flow.initialPinLength}
           sessionOutcome={session.outcome}
           vaultStatus={vault.status}
           autoSaveNote={autoSaveNote}

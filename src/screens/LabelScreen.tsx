@@ -43,6 +43,7 @@ function labelReducer(state: LabelState, action: LabelAction): LabelState {
 interface LabelScreenProps {
   masterKey: CryptoKey;
   initialLabel?: string;
+  initialPinLength?: number;
   sessionOutcome: 'persisted' | 'in-memory';
   vaultStatus: VaultStatus;
   autoSaveNote: boolean;
@@ -65,17 +66,23 @@ async function getLabelResult(
 export function LabelScreen({
   masterKey,
   initialLabel = '',
+  initialPinLength = 4,
   sessionOutcome,
   vaultStatus,
   autoSaveNote,
   onProceed,
   onOpenVault
 }: LabelScreenProps): JSX.Element {
+  const startsInCustomMode = ![4, 6, 8].includes(initialPinLength);
   const [state, dispatch] = useReducer(labelReducer, { kind: 'idle' });
   const [label, setLabel] = useState(initialLabel);
-  const [length, setLength] = useState(4);
-  const [customMode, setCustomMode] = useState(false);
-  const [customLen, setCustomLen] = useState(5);
+  const [length, setLength] = useState(
+    startsInCustomMode ? 4 : initialPinLength
+  );
+  const [customMode, setCustomMode] = useState(startsInCustomMode);
+  const [customLen, setCustomLen] = useState(
+    startsInCustomMode ? initialPinLength : 5
+  );
 
   const isVerified = state.kind === 'verified';
   const isBusy = state.kind === 'deriving';

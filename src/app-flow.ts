@@ -9,6 +9,7 @@ export type LabelResult = {
 type LabelFlowState = {
   route: 'label';
   initialLabel: string;
+  initialPinLength: number;
   origin: 'manual' | 'vault';
   labelVersion: number;
 };
@@ -33,13 +34,19 @@ export type FlowAction =
   | { type: 'openVault' }
   | { type: 'closeVault' }
   | { type: 'selectVaultLabel'; label: SavedLabel }
-  | { type: 'showReveal'; pin: string; label: string }
+  | {
+      type: 'showReveal';
+      pin: string;
+      label: string;
+      origin: 'manual' | 'vault';
+    }
   | { type: 'exitReveal' }
   | { type: 'reset' };
 
 export const initialFlowState: FlowState = {
   route: 'label',
   initialLabel: '',
+  initialPinLength: 4,
   origin: 'manual',
   labelVersion: 0
 };
@@ -79,6 +86,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return {
         route: 'label',
         initialLabel: action.label.originalLabel,
+        initialPinLength: action.label.pinLength,
         origin: 'vault',
         labelVersion:
           state.route === 'vault'
@@ -94,7 +102,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return {
         route: 'reveal',
         result: { pin: action.pin, label: action.label },
-        origin: labelCameFromVault(state, action.label) ? 'vault' : 'manual',
+        origin: action.origin,
         labelVersion: state.labelVersion
       };
 
@@ -106,6 +114,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return {
         route: 'label',
         initialLabel: '',
+        initialPinLength: 4,
         origin: 'manual',
         labelVersion: state.labelVersion
       };

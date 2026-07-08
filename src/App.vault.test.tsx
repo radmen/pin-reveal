@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -171,6 +172,7 @@ beforeEach(async (): Promise<void> => {
 afterEach((): void => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe('App — Vault', (): void => {
@@ -391,5 +393,94 @@ describe('App — Vault', (): void => {
       await screen.findByRole('heading', { name: /vault is off/i })
     ).toBeInTheDocument();
     expect(mockedForgetVault).toHaveBeenCalledOnce();
+  });
+
+  it('uses the saved pin length when selecting a vault label', async (): Promise<void> => {
+    mockedLoadMasterKey.mockResolvedValue(await createKey());
+    mockedCheckPrfSupport.mockResolvedValue(true);
+    mockedLoadVaultCredential.mockResolvedValue(fakeVaultCredential);
+    mockedLoadVaultData.mockResolvedValue(fakeVaultEncryptedData);
+    mockedDecryptLabels.mockResolvedValue([
+      {
+        originalLabel: 'Garage',
+        normalizedLabel: 'garage',
+        pinLength: 6,
+        lastUsedAt: 1
+      }
+    ]);
+
+    render(<App />);
+    await screen.findByRole('heading', { name: /new pin/i });
+
+    fireEvent.click(await screen.findByRole('button', { name: /vault/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /unlock vault/i })
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Garage' }));
+
+    expect(await screen.findByDisplayValue('Garage')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '6' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /generate pin/i }));
+    await screen.findByText(/pin ready/i);
+    fireEvent.click(screen.getByRole('button', { name: /proceed/i }));
+
+    await waitFor((): void => {
+      expect(mockedEncryptLabels).toHaveBeenCalled();
+      const calls = mockedEncryptLabels.mock.calls;
+      const savedLabels = calls[calls.length - 1][1];
+      expect(savedLabels).toEqual([
+        expect.objectContaining({
+          originalLabel: 'Garage',
+          normalizedLabel: 'garage',
+          pinLength: 6
+        })
+      ]);
+    });
+  });
+
+  it('offers a fresh vault save when a selected label times out before reveal', async (): Promise<void> => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockedLoadMasterKey.mockResolvedValue(await createKey());
+    mockedCheckPrfSupport.mockResolvedValue(true);
+    mockedLoadVaultCredential.mockResolvedValue(fakeVaultCredential);
+    mockedLoadVaultData.mockResolvedValue(fakeVaultEncryptedData);
+    mockedDecryptLabels.mockResolvedValue([
+      {
+        originalLabel: 'Garage',
+        normalizedLabel: 'garage',
+        pinLength: 4,
+        lastUsedAt: 1
+      }
+    ]);
+
+    render(<App />);
+    await screen.findByRole('heading', { name: /new pin/i });
+
+    fireEvent.click(await screen.findByRole('button', { name: /vault/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /unlock vault/i })
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Garage' }));
+    await screen.findByDisplayValue('Garage');
+
+    act((): void => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /generate pin/i }));
+    await screen.findByText(/pin ready/i);
+    fireEvent.click(screen.getByRole('button', { name: /proceed/i }));
+    await screen.findByText(/press reveal to show segment/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /reveal segment/i }));
+    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+
+    expect(
+      await screen.findByRole('button', { name: /save to vault/i })
+    ).toBeInTheDocument();
   });
 });
