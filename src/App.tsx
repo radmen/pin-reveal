@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
   KeyPersistenceWarningBanner,
   type KeyPersistenceError
@@ -16,34 +16,14 @@ import {
   StoreKeyError,
   storeMasterKey
 } from './key-persistence';
-import {
-  checkPrfSupport,
-  createVaultPasskey,
-  getVaultPrfOutput,
-  type VaultPasskeyDiagnosticEvent,
-  type VaultPasskeyDiagnosticRecorder,
-  VaultPasskeyCancelledError,
-  VaultPasskeyError,
-  VaultPasskeyNotSupportedError
-} from './vault-passkey.adapter';
-import {
-  decryptLabels,
-  deriveVaultKey,
-  encryptLabels,
-  forgetVault,
-  loadVaultCredential,
-  loadVaultData,
-  type SavedLabel,
-  storeVaultCredential,
-  storeVaultData,
-  VaultPersistenceError
-} from './vault-persistence';
+import { forgetVault, type SavedLabel } from './vault-persistence';
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
-import { VaultScreen, type VaultStatus } from './screens/VaultScreen';
+import { VaultScreen } from './screens/VaultScreen';
 import { normalizeLabel } from './derivation-contract';
 import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
+import { useVaultController } from './useVaultController';
 import styles from './App.module.css';
 
 type Theme = 'dark' | 'light';
@@ -53,25 +33,6 @@ type UnlockedSession = {
   key: CryptoKey;
   outcome: SessionOutcome;
 };
-
-const VAULT_UNLOCK_TIMEOUT_MS = 60_000;
-
-function findVaultDiagnosticsEnabled(): boolean {
-  if (import.meta.env.MODE !== 'production') {
-    return true;
-  }
-
-  try {
-    const searchParameters = new URLSearchParams(window.location.search);
-
-    return (
-      searchParameters.get('vault-debug') === '1' ||
-      localStorage.getItem('pinderive.vaultDebug') === 'true'
-    );
-  } catch {
-    return false;
-  }
-}
 
 function findStoredTheme(): Theme | null {
   try {
@@ -114,30 +75,12 @@ export function App(): JSX.Element {
     label: string;
   } | null>(null);
 
-  // vault
-  const [vaultStatus, setVaultStatus] = useState<VaultStatus>('unavailable');
-  const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
-  const [savedLabels, setSavedLabels] = useState<SavedLabel[]>([]);
-  const [vaultBusy, setVaultBusy] = useState(false);
+  const vault = useVaultController();
+  const initializeVaultStatus = vault.initializeStatus;
   const [showVault, setShowVault] = useState(false);
   const [selectedFromVault, setSelectedFromVault] = useState(false);
   const [pendingLabel, setPendingLabel] = useState('');
   const [labelScreenKey, setLabelScreenKey] = useState(0);
-  const [vaultSaved, setVaultSaved] = useState(false);
-  const [vaultSaveBusy, setVaultSaveBusy] = useState(false);
-  const [vaultDiagnosticsEnabled] = useState(findVaultDiagnosticsEnabled);
-  const [vaultDiagnosticEvents, setVaultDiagnosticEvents] = useState<
-    VaultPasskeyDiagnosticEvent[]
-  >([]);
-
-  const vaultKeyRef = useRef<CryptoKey | null>(null);
-  const savedLabelsRef = useRef<SavedLabel[]>([]);
-  const vaultStatusRef = useRef<VaultStatus>('unavailable');
-  const isRemovingLabelRef = useRef(false);
-
-  vaultKeyRef.current = vaultKey;
-  savedLabelsRef.current = savedLabels;
-  vaultStatusRef.current = vaultStatus;
 
   useEffect(() => {
     let applyUpdate: ApplyAppUpdate = () => {};
@@ -167,60 +110,7 @@ export function App(): JSX.Element {
 
         throw error;
       });
-  }, []);
-
-  useEffect(() => {
-    if (vaultStatus !== 'unlocked') {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      lockVault();
-    }, VAULT_UNLOCK_TIMEOUT_MS);
-
-    return () => clearTimeout(timer);
-  }, [vaultStatus]);
-
-  async function initializeVaultStatus(): Promise<void> {
-    try {
-      const supported = await checkPrfSupport(findVaultDiagnosticRecorder());
-      if (!supported) {
-        setVaultStatus('unavailable');
-        return;
-      }
-      const credential = await loadVaultCredential();
-      setVaultStatus(credential ? 'locked' : 'unenrolled');
-    } catch (error: unknown) {
-      if (
-        error instanceof VaultPersistenceError ||
-        error instanceof VaultPasskeyError
-      ) {
-        setVaultStatus('unavailable');
-        return;
-      }
-
-      throw error;
-    }
-  }
-
-  async function performVaultUnlock(): Promise<{
-    key: CryptoKey;
-    labels: SavedLabel[];
-  }> {
-    const credential = await loadVaultCredential();
-    if (!credential) {
-      throw new Error('No vault credential found.');
-    }
-    const prfOutput = await getVaultPrfOutput(
-      credential.credentialId,
-      credential.prfSalt,
-      findVaultDiagnosticRecorder()
-    );
-    const key = await deriveVaultKey(prfOutput, credential.prfSalt);
-    const data = await loadVaultData();
-    const labels = data ? await decryptLabels(key, data) : [];
-    return { key, labels };
-  }
+  }, [initializeVaultStatus]);
 
   async function handleLoginConfirm(confirmedKey: CryptoKey): Promise<void> {
     try {
@@ -246,7 +136,10 @@ export function App(): JSX.Element {
     }
 
     setMenuOpen(false);
-    resetVaultState();
+    setShowVault(false);
+    setSelectedFromVault(false);
+    setPendingLabel('');
+    vault.reset();
 
     if (activeSession.outcome === 'in-memory') {
       setSession(null);
@@ -271,143 +164,11 @@ export function App(): JSX.Element {
       });
   }
 
-  function resetVaultState(): void {
-    setVaultKey(null);
-    setSavedLabels([]);
-    setVaultStatus('unavailable');
-    setShowVault(false);
-    setSelectedFromVault(false);
-    setPendingLabel('');
-    setVaultSaved(false);
-    setVaultSaveBusy(false);
-    setVaultBusy(false);
-    setVaultDiagnosticEvents([]);
-  }
-
-  function recordVaultDiagnosticEvent(
-    event: VaultPasskeyDiagnosticEvent
-  ): void {
-    setVaultDiagnosticEvents((events) => [...events, event].slice(-50));
-  }
-
-  function findVaultDiagnosticRecorder():
-    VaultPasskeyDiagnosticRecorder | undefined {
-    return vaultDiagnosticsEnabled ? recordVaultDiagnosticEvent : undefined;
-  }
-
-  function resetVaultDiagnostics(): void {
-    if (!vaultDiagnosticsEnabled) {
-      return;
-    }
-
-    setVaultDiagnosticEvents([]);
-  }
-
-  function lockVault(): void {
-    setVaultKey(null);
-    setSavedLabels([]);
-    setVaultStatus('locked');
-  }
-
-  function updateSavedLabels(
-    labels: SavedLabel[],
-    label: string,
-    pinLength: number
-  ): SavedLabel[] {
-    const normalizedLabel = normalizeLabel(label);
-    if (!normalizedLabel) {
-      return labels;
-    }
-
-    return [
-      {
-        originalLabel: label,
-        normalizedLabel,
-        pinLength,
-        lastUsedAt: Date.now()
-      },
-      ...labels.filter(
-        (savedLabel) => savedLabel.normalizedLabel !== normalizedLabel
-      )
-    ];
-  }
-
   function toggleTheme(): void {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
 
     storeThemePreference(nextTheme);
     setTheme(nextTheme);
-  }
-
-  async function handleEnableVault(): Promise<void> {
-    resetVaultDiagnostics();
-    setVaultBusy(true);
-    try {
-      const { credentialId, prfSalt, prfOutput } = await createVaultPasskey(
-        findVaultDiagnosticRecorder()
-      );
-      const key = await deriveVaultKey(prfOutput, prfSalt);
-      const data = await encryptLabels(key, []);
-      try {
-        await storeVaultCredential({ credentialId, prfSalt });
-        await storeVaultData(data);
-      } catch (storageError: unknown) {
-        await forgetVault();
-        throw storageError;
-      }
-      setVaultKey(null);
-      setSavedLabels([]);
-      setVaultStatus('locked');
-    } catch (error: unknown) {
-      if (error instanceof VaultPasskeyNotSupportedError) {
-        setVaultStatus('unavailable');
-        return;
-      }
-
-      if (error instanceof VaultPasskeyCancelledError) {
-        return;
-      }
-
-      throw error;
-    } finally {
-      setVaultBusy(false);
-    }
-  }
-
-  async function handleUnlockVault(): Promise<void> {
-    resetVaultDiagnostics();
-    setVaultBusy(true);
-    try {
-      const { key, labels } = await performVaultUnlock();
-      setVaultKey(key);
-      setSavedLabels(labels);
-      setVaultStatus('unlocked');
-    } catch (error: unknown) {
-      if (error instanceof VaultPasskeyNotSupportedError) {
-        setVaultStatus('unavailable');
-        return;
-      }
-
-      if (error instanceof VaultPasskeyCancelledError) {
-        return;
-      }
-
-      throw error;
-    } finally {
-      setVaultBusy(false);
-    }
-  }
-
-  function handleLockVault(): void {
-    lockVault();
-  }
-
-  async function handleDisableVault(): Promise<void> {
-    await forgetVault();
-    setVaultKey(null);
-    setSavedLabels([]);
-    setVaultStatus('unenrolled');
-    // stay on vault screen so user sees the unenrolled state
   }
 
   function handleSelectLabel(label: SavedLabel): void {
@@ -416,28 +177,7 @@ export function App(): JSX.Element {
     setSelectedFromVault(true);
     setShowVault(false);
     setLabelResult(null);
-    setVaultSaved(false);
-  }
-
-  async function handleRemoveLabel(label: SavedLabel): Promise<void> {
-    if (isRemovingLabelRef.current) {
-      return;
-    }
-    const key = vaultKeyRef.current;
-    if (!key || vaultStatusRef.current !== 'unlocked') {
-      return;
-    }
-    isRemovingLabelRef.current = true;
-    try {
-      const updated = savedLabelsRef.current.filter(
-        (savedLabel) => savedLabel.normalizedLabel !== label.normalizedLabel
-      );
-      const data = await encryptLabels(key, updated);
-      await storeVaultData(data);
-      setSavedLabels(updated);
-    } finally {
-      isRemovingLabelRef.current = false;
-    }
+    vault.clearSavedState();
   }
 
   function handleLabelProceed(pin: string, label: string): void {
@@ -448,93 +188,24 @@ export function App(): JSX.Element {
     setSelectedFromVault(isFromVault);
     setPendingLabel('');
     setLabelResult({ pin, label });
-    setVaultSaved(false);
+    vault.clearSavedState();
     if (isFromVault) {
-      void saveOrUpdateVaultLabel(label, pin.length, savedLabelsRef.current);
+      void vault.saveUnlockedLabel(label, pin.length);
     }
-  }
-
-  async function saveOrUpdateVaultLabel(
-    label: string,
-    pinLength: number,
-    labels: SavedLabel[]
-  ): Promise<void> {
-    const key = vaultKeyRef.current;
-    if (!key || vaultStatusRef.current !== 'unlocked') {
-      return;
-    }
-
-    const updated = updateSavedLabels(labels, label, pinLength);
-    const data = await encryptLabels(key, updated);
-    await storeVaultData(data);
-    setVaultSaved(true);
-    lockVault();
   }
 
   async function handleSaveToVault(): Promise<void> {
     if (!labelResult) {
       return;
     }
-    const currentStatus = vaultStatusRef.current;
-    if (currentStatus !== 'locked' && currentStatus !== 'unlocked') {
-      return;
-    }
-
-    resetVaultDiagnostics();
-    setVaultSaveBusy(true);
-    try {
-      let key: CryptoKey;
-      let labels: SavedLabel[];
-
-      if (currentStatus === 'locked' || !vaultKeyRef.current) {
-        const unlocked = await performVaultUnlock();
-        key = unlocked.key;
-        labels = unlocked.labels;
-      } else {
-        key = vaultKeyRef.current;
-        labels = savedLabelsRef.current;
-      }
-
-      const updated = updateSavedLabels(
-        labels,
-        labelResult.label,
-        labelResult.pin.length
-      );
-      if (updated !== labels) {
-        const data = await encryptLabels(key, updated);
-        await storeVaultData(data);
-        setVaultSaved(true);
-        lockVault();
-      }
-    } catch (error: unknown) {
-      if (error instanceof VaultPasskeyNotSupportedError) {
-        setVaultStatus('unavailable');
-        return;
-      }
-
-      if (error instanceof VaultPasskeyCancelledError) {
-        return;
-      }
-
-      throw error;
-    } finally {
-      setVaultSaveBusy(false);
-    }
+    await vault.saveLabel(labelResult.label, labelResult.pin.length);
   }
 
   const isPersisted = session?.outcome === 'persisted';
-  const vaultEnrolled = vaultStatus === 'locked' || vaultStatus === 'unlocked';
+  const vaultEnrolled =
+    vault.status === 'locked' || vault.status === 'unlocked';
   const showSaveToVault =
-    isPersisted && vaultEnrolled && !selectedFromVault && !vaultSaved;
-
-  const vaultDiagnosticRunLabel =
-    vaultStatus === 'locked' || vaultStatus === 'unlocked'
-      ? 'Run unlock check'
-      : 'Try enabling Vault';
-  const runVaultDiagnostics =
-    vaultStatus === 'locked' || vaultStatus === 'unlocked'
-      ? handleUnlockVault
-      : handleEnableVault;
+    isPersisted && vaultEnrolled && !selectedFromVault && !vault.isSaved;
 
   // autoSaveNote: label came from vault, already saved — show confirmation in LabelScreen
   const autoSaveNote = isPersisted && selectedFromVault;
@@ -551,20 +222,20 @@ export function App(): JSX.Element {
     if (showVault) {
       return (
         <VaultScreen
-          status={vaultStatus}
-          isBusy={vaultBusy}
-          savedLabels={savedLabels}
-          diagnosticsEnabled={vaultDiagnosticsEnabled}
-          diagnosticEvents={vaultDiagnosticEvents}
-          diagnosticRunLabel={vaultDiagnosticRunLabel}
-          onEnable={handleEnableVault}
-          onUnlock={handleUnlockVault}
-          onLock={handleLockVault}
-          onDisable={handleDisableVault}
+          status={vault.status}
+          isBusy={vault.isBusy}
+          savedLabels={vault.savedLabels}
+          diagnosticsEnabled={vault.diagnosticsEnabled}
+          diagnosticEvents={vault.diagnosticEvents}
+          diagnosticRunLabel={vault.diagnosticRunLabel}
+          onEnable={vault.enable}
+          onUnlock={vault.unlock}
+          onLock={vault.lock}
+          onDisable={vault.disable}
           onSelectLabel={handleSelectLabel}
-          onRemoveLabel={handleRemoveLabel}
+          onRemoveLabel={vault.removeLabel}
           onRunDiagnostics={
-            vaultDiagnosticsEnabled ? runVaultDiagnostics : undefined
+            vault.diagnosticsEnabled ? vault.runDiagnostics : undefined
           }
           onExit={() => setShowVault(false)}
         />
@@ -578,7 +249,7 @@ export function App(): JSX.Element {
           masterKey={session.key}
           initialLabel={pendingLabel}
           sessionOutcome={session.outcome}
-          vaultStatus={vaultStatus}
+          vaultStatus={vault.status}
           autoSaveNote={autoSaveNote}
           onProceed={handleLabelProceed}
           onOpenVault={() => setShowVault(true)}
@@ -592,8 +263,8 @@ export function App(): JSX.Element {
         label={labelResult.label}
         revealTime={revealTime}
         showSaveToVault={showSaveToVault}
-        isSaveToVaultBusy={vaultSaveBusy}
-        isSavedToVault={vaultSaved}
+        isSaveToVaultBusy={vault.isSaveBusy}
+        isSavedToVault={vault.isSaved}
         onExit={() => {
           setLabelResult(null);
           setSelectedFromVault(false);
@@ -625,7 +296,7 @@ export function App(): JSX.Element {
             <MenuDrawer
               revealTime={revealTime}
               sessionOutcome={session?.outcome ?? null}
-              vaultStatus={vaultStatus}
+              vaultStatus={vault.status}
               onChangeRevealTime={setRevealTime}
               onOpenVault={() => {
                 setMenuOpen(false);

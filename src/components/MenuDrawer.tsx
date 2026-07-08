@@ -1,6 +1,6 @@
 import type { JSX } from 'preact';
 import { CapLabel } from './CapLabel';
-import type { VaultStatus } from '../screens/VaultScreen';
+import type { VaultStatus } from '../useVaultController';
 import styles from './MenuDrawer.module.css';
 
 interface MenuDrawerProps {

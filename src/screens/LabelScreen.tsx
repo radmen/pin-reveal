@@ -9,7 +9,7 @@ import {
   derivePin,
   normalizeLabel
 } from '../derivation-contract';
-import type { VaultStatus } from './VaultScreen';
+import type { VaultStatus } from '../useVaultController';
 import styles from './LabelScreen.module.css';
 
 type LabelState =

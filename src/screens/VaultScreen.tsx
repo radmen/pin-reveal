@@ -3,10 +3,9 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { PrimaryButton } from '../components/PrimaryButton';
 import type { VaultPasskeyDiagnosticEvent } from '../vault-passkey.adapter';
 import type { SavedLabel } from '../vault-persistence';
+import type { VaultStatus } from '../useVaultController';
 import { VaultInspectorScreen } from './VaultInspectorScreen';
 import styles from './VaultScreen.module.css';
-
-export type VaultStatus = 'unavailable' | 'unenrolled' | 'locked' | 'unlocked';
 
 interface VaultScreenProps {
   status: VaultStatus;
