@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useReducer, useState } from 'preact/hooks';
 import {
   KeyPersistenceWarningBanner,
   type KeyPersistenceError
@@ -33,6 +33,120 @@ type UnlockedSession = {
   key: CryptoKey;
   outcome: SessionOutcome;
 };
+
+type LabelResult = {
+  pin: string;
+  label: string;
+};
+
+type LabelFlowState = {
+  route: 'label';
+  initialLabel: string;
+  origin: 'manual' | 'vault';
+  labelVersion: number;
+};
+
+type RevealFlowState = {
+  route: 'reveal';
+  result: LabelResult;
+  origin: 'manual' | 'vault';
+  labelVersion: number;
+};
+
+type PrimaryFlowState = LabelFlowState | RevealFlowState;
+
+type VaultFlowState = {
+  route: 'vault';
+  returnState: PrimaryFlowState;
+};
+
+type FlowState = PrimaryFlowState | VaultFlowState;
+
+type FlowAction =
+  | { type: 'openVault' }
+  | { type: 'closeVault' }
+  | { type: 'selectVaultLabel'; label: SavedLabel }
+  | { type: 'showReveal'; pin: string; label: string }
+  | { type: 'exitReveal' }
+  | { type: 'reset' };
+
+const initialFlowState: FlowState = {
+  route: 'label',
+  initialLabel: '',
+  origin: 'manual',
+  labelVersion: 0
+};
+
+function labelCameFromVault(state: FlowState, label: string): boolean {
+  if (state.route !== 'label') {
+    return false;
+  }
+
+  return (
+    state.origin === 'vault' &&
+    state.initialLabel !== '' &&
+    normalizeLabel(label) === normalizeLabel(state.initialLabel)
+  );
+}
+
+function flowReducer(state: FlowState, action: FlowAction): FlowState {
+  switch (action.type) {
+    case 'openVault':
+      if (state.route === 'vault') {
+        return state;
+      }
+
+      return {
+        route: 'vault',
+        returnState: state
+      };
+
+    case 'closeVault':
+      if (state.route !== 'vault') {
+        return state;
+      }
+
+      return state.returnState;
+
+    case 'selectVaultLabel':
+      return {
+        route: 'label',
+        initialLabel: action.label.originalLabel,
+        origin: 'vault',
+        labelVersion:
+          state.route === 'vault'
+            ? state.returnState.labelVersion + 1
+            : state.labelVersion + 1
+      };
+
+    case 'showReveal':
+      if (state.route !== 'label') {
+        return state;
+      }
+
+      return {
+        route: 'reveal',
+        result: { pin: action.pin, label: action.label },
+        origin: labelCameFromVault(state, action.label) ? 'vault' : 'manual',
+        labelVersion: state.labelVersion
+      };
+
+    case 'exitReveal':
+      if (state.route !== 'reveal') {
+        return state;
+      }
+
+      return {
+        route: 'label',
+        initialLabel: '',
+        origin: 'manual',
+        labelVersion: state.labelVersion
+      };
+
+    case 'reset':
+      return initialFlowState;
+  }
+}
 
 function findStoredTheme(): Theme | null {
   try {
@@ -70,17 +184,10 @@ export function App(): JSX.Element {
   const [applyAppUpdate, setApplyAppUpdate] = useState<ApplyAppUpdate | null>(
     null
   );
-  const [labelResult, setLabelResult] = useState<{
-    pin: string;
-    label: string;
-  } | null>(null);
+  const [flow, dispatchFlow] = useReducer(flowReducer, initialFlowState);
 
   const vault = useVaultController();
   const initializeVaultStatus = vault.initializeStatus;
-  const [showVault, setShowVault] = useState(false);
-  const [selectedFromVault, setSelectedFromVault] = useState(false);
-  const [pendingLabel, setPendingLabel] = useState('');
-  const [labelScreenKey, setLabelScreenKey] = useState(0);
 
   useEffect(() => {
     let applyUpdate: ApplyAppUpdate = () => {};
@@ -136,14 +243,11 @@ export function App(): JSX.Element {
     }
 
     setMenuOpen(false);
-    setShowVault(false);
-    setSelectedFromVault(false);
-    setPendingLabel('');
+    dispatchFlow({ type: 'reset' });
     vault.reset();
 
     if (activeSession.outcome === 'in-memory') {
       setSession(null);
-      setLabelResult(null);
       setKeyPersistenceError(null);
       return;
     }
@@ -151,7 +255,6 @@ export function App(): JSX.Element {
     Promise.all([forgetMasterKey(), forgetVault()])
       .then(() => {
         setSession(null);
-        setLabelResult(null);
         setKeyPersistenceError(null);
       })
       .catch((error: unknown) => {
@@ -172,43 +275,39 @@ export function App(): JSX.Element {
   }
 
   function handleSelectLabel(label: SavedLabel): void {
-    setPendingLabel(label.originalLabel);
-    setLabelScreenKey((k) => k + 1);
-    setSelectedFromVault(true);
-    setShowVault(false);
-    setLabelResult(null);
+    dispatchFlow({ type: 'selectVaultLabel', label });
     vault.clearSavedState();
   }
 
   function handleLabelProceed(pin: string, label: string): void {
-    const isFromVault =
-      selectedFromVault &&
-      pendingLabel !== '' &&
-      normalizeLabel(label) === normalizeLabel(pendingLabel);
-    setSelectedFromVault(isFromVault);
-    setPendingLabel('');
-    setLabelResult({ pin, label });
+    const shouldSaveUnlockedLabel = labelCameFromVault(flow, label);
+    dispatchFlow({ type: 'showReveal', pin, label });
     vault.clearSavedState();
-    if (isFromVault) {
+    if (shouldSaveUnlockedLabel) {
       void vault.saveUnlockedLabel(label, pin.length);
     }
   }
 
   async function handleSaveToVault(): Promise<void> {
-    if (!labelResult) {
+    if (flow.route !== 'reveal') {
       return;
     }
-    await vault.saveLabel(labelResult.label, labelResult.pin.length);
+    await vault.saveLabel(flow.result.label, flow.result.pin.length);
   }
 
   const isPersisted = session?.outcome === 'persisted';
   const vaultEnrolled =
     vault.status === 'locked' || vault.status === 'unlocked';
   const showSaveToVault =
-    isPersisted && vaultEnrolled && !selectedFromVault && !vault.isSaved;
+    isPersisted &&
+    vaultEnrolled &&
+    flow.route === 'reveal' &&
+    flow.origin !== 'vault' &&
+    !vault.isSaved;
 
   // autoSaveNote: label came from vault, already saved — show confirmation in LabelScreen
-  const autoSaveNote = isPersisted && selectedFromVault;
+  const autoSaveNote =
+    isPersisted && flow.route === 'label' && flow.origin === 'vault';
 
   function screen(): JSX.Element {
     if (session === undefined) {
@@ -219,7 +318,7 @@ export function App(): JSX.Element {
       return <LoginScreen onConfirm={handleLoginConfirm} />;
     }
 
-    if (showVault) {
+    if (flow.route === 'vault') {
       return (
         <VaultScreen
           status={vault.status}
@@ -237,39 +336,35 @@ export function App(): JSX.Element {
           onRunDiagnostics={
             vault.diagnosticsEnabled ? vault.runDiagnostics : undefined
           }
-          onExit={() => setShowVault(false)}
+          onExit={() => dispatchFlow({ type: 'closeVault' })}
         />
       );
     }
 
-    if (!labelResult) {
+    if (flow.route === 'label') {
       return (
         <LabelScreen
-          key={labelScreenKey}
+          key={flow.labelVersion}
           masterKey={session.key}
-          initialLabel={pendingLabel}
+          initialLabel={flow.initialLabel}
           sessionOutcome={session.outcome}
           vaultStatus={vault.status}
           autoSaveNote={autoSaveNote}
           onProceed={handleLabelProceed}
-          onOpenVault={() => setShowVault(true)}
+          onOpenVault={() => dispatchFlow({ type: 'openVault' })}
         />
       );
     }
 
     return (
       <RevealScreen
-        pin={labelResult.pin}
-        label={labelResult.label}
+        pin={flow.result.pin}
+        label={flow.result.label}
         revealTime={revealTime}
         showSaveToVault={showSaveToVault}
         isSaveToVaultBusy={vault.isSaveBusy}
         isSavedToVault={vault.isSaved}
-        onExit={() => {
-          setLabelResult(null);
-          setSelectedFromVault(false);
-          setPendingLabel('');
-        }}
+        onExit={() => dispatchFlow({ type: 'exitReveal' })}
         onSaveToVault={handleSaveToVault}
       />
     );
@@ -300,7 +395,7 @@ export function App(): JSX.Element {
               onChangeRevealTime={setRevealTime}
               onOpenVault={() => {
                 setMenuOpen(false);
-                setShowVault(true);
+                dispatchFlow({ type: 'openVault' });
               }}
               onLogout={handleLogout}
               onClose={() => setMenuOpen(false)}
