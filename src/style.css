@@ -36,6 +36,9 @@ body {
   --placeholder: #45454b;
   --scrim: rgba(0, 0, 0, 0.6);
   --shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  --danger: #f0616d;
+  --danger-bg: rgba(240, 97, 109, 0.13);
+  --ok: #4ade80;
 }
 
 [data-theme='light'] {
@@ -61,6 +64,9 @@ body {
   --placeholder: #aeaeb4;
   --scrim: rgba(0, 0, 0, 0.32);
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.13);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.09);
+  --ok: #16a34a;
 }
 
 input::placeholder {

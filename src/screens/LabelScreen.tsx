@@ -9,6 +9,7 @@ import {
   derivePin,
   normalizeLabel
 } from '../derivation-contract';
+import type { VaultStatus } from '../vault-types';
 import styles from './LabelScreen.module.css';
 
 type LabelState =
@@ -41,7 +42,12 @@ function labelReducer(state: LabelState, action: LabelAction): LabelState {
 
 interface LabelScreenProps {
   masterKey: CryptoKey;
+  initialLabel?: string;
+  initialPinLength?: number;
+  sessionOutcome: 'persisted' | 'in-memory';
+  vaultStatus: VaultStatus;
   onProceed(pin: string, label: string): void;
+  onOpenVault(): void;
 }
 
 async function getLabelResult(
@@ -58,13 +64,23 @@ async function getLabelResult(
 
 export function LabelScreen({
   masterKey,
-  onProceed
+  initialLabel = '',
+  initialPinLength = 4,
+  sessionOutcome,
+  vaultStatus,
+  onProceed,
+  onOpenVault
 }: LabelScreenProps): JSX.Element {
+  const startsInCustomMode = ![4, 6, 8].includes(initialPinLength);
   const [state, dispatch] = useReducer(labelReducer, { kind: 'idle' });
-  const [label, setLabel] = useState('');
-  const [length, setLength] = useState(4);
-  const [customMode, setCustomMode] = useState(false);
-  const [customLen, setCustomLen] = useState(5);
+  const [label, setLabel] = useState(initialLabel);
+  const [length, setLength] = useState(
+    startsInCustomMode ? 4 : initialPinLength
+  );
+  const [customMode, setCustomMode] = useState(startsInCustomMode);
+  const [customLen, setCustomLen] = useState(
+    startsInCustomMode ? initialPinLength : 5
+  );
 
   const isVerified = state.kind === 'verified';
   const isBusy = state.kind === 'deriving';
@@ -107,10 +123,22 @@ export function LabelScreen({
         void generate();
       }}
     >
-      <ScreenHeader
-        eyebrow={<CapLabel>Step 02 · Derive a PIN</CapLabel>}
-        title="New PIN"
-      />
+      <div className={styles.screenHeader}>
+        <ScreenHeader
+          eyebrow={<CapLabel>Step 02 · Derive a PIN</CapLabel>}
+          title="New PIN"
+        />
+        {sessionOutcome === 'persisted' && (
+          <button
+            type="button"
+            onClick={onOpenVault}
+            className={styles.vaultButton}
+          >
+            <span className={styles.vaultDot} data-status={vaultStatus} />
+            Vault
+          </button>
+        )}
+      </div>
 
       <div className={styles.fields}>
         <div className={styles.fieldGroup}>

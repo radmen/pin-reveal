@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:dev": "tsc --noEmit && vite build --mode development",
+    "serve": "vite preview --host 0.0.0.0",
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",

@@ -1,154 +1,83 @@
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
-import {
-  KeyPersistenceWarningBanner,
-  type KeyPersistenceError
-} from './components/KeyPersistenceWarningBanner';
+import { useReducer, useState } from 'preact/hooks';
+import { KeyPersistenceWarningBanner } from './components/KeyPersistenceWarningBanner';
 import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
 import { UpdateReadyBanner } from './components/UpdateReadyBanner';
-import {
-  ForgetKeyError,
-  forgetMasterKey,
-  LoadKeyError,
-  loadMasterKey,
-  StoreKeyError,
-  storeMasterKey
-} from './key-persistence';
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
-import { type ApplyAppUpdate, subscribeToAppUpdate } from './pwa-update';
+import { VaultScreen } from './screens/VaultScreen';
+import { flowReducer, initialFlowState, labelCameFromVault } from './app-flow';
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { usePersistentSession } from './hooks/usePersistentSession';
+import { useThemePreference } from './hooks/useThemePreference';
+import { useVaultController } from './hooks/useVaultController';
+import type { SavedLabel } from './vault-types';
 import styles from './App.module.css';
 
-type Theme = 'dark' | 'light';
-type SessionOutcome = 'persisted' | 'in-memory';
-
-type UnlockedSession = {
-  key: CryptoKey;
-  outcome: SessionOutcome;
-};
-
-function findStoredTheme(): Theme | null {
-  try {
-    const savedTheme = localStorage.getItem('pinderive.theme');
-
-    if (savedTheme === 'dark' || savedTheme === 'light') {
-      return savedTheme;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function storeThemePreference(theme: Theme): void {
-  try {
-    localStorage.setItem('pinderive.theme', theme);
-  } catch {
-    return;
-  }
-}
-
 export function App(): JSX.Element {
-  // ponytail: undefined = IDB loading (Splash); null = no key (LoginScreen).
-  // jsdom has no indexedDB, so skip Splash in tests by initialising to null.
-  const [session, setSession] = useState<UnlockedSession | null | undefined>(
-    typeof indexedDB === 'undefined' ? null : undefined
-  );
-  const [theme, setTheme] = useState<Theme>(() => findStoredTheme() ?? 'dark');
+  const { theme, toggleTheme } = useThemePreference();
   const [revealTime, setRevealTime] = useState(250);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [keyPersistenceError, setKeyPersistenceError] =
-    useState<KeyPersistenceError | null>(null);
-  const [applyAppUpdate, setApplyAppUpdate] = useState<ApplyAppUpdate | null>(
-    null
-  );
-  const [labelResult, setLabelResult] = useState<{
-    pin: string;
-    label: string;
-  } | null>(null);
+  const applyAppUpdate = useAppUpdate();
+  const [flow, dispatchFlow] = useReducer(flowReducer, initialFlowState);
 
-  useEffect(() => {
-    let applyUpdate: ApplyAppUpdate = () => {};
-    applyUpdate = subscribeToAppUpdate((): void => {
-      setApplyAppUpdate(() => applyUpdate);
-    });
-
-    if (typeof indexedDB === 'undefined') {
-      return;
-    }
-
-    void loadMasterKey()
-      .then((loadedKey) => {
-        setSession(loadedKey ? { key: loadedKey, outcome: 'persisted' } : null);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof LoadKeyError) {
-          setKeyPersistenceError(error);
-          setSession(null);
-          return;
-        }
-
-        throw error;
-      });
-  }, []);
-
-  async function handleLoginConfirm(confirmedKey: CryptoKey): Promise<void> {
-    try {
-      await storeMasterKey(confirmedKey);
-      setSession({ key: confirmedKey, outcome: 'persisted' });
-    } catch (error: unknown) {
-      if (error instanceof StoreKeyError) {
-        setKeyPersistenceError(error);
-        setSession({ key: confirmedKey, outcome: 'in-memory' });
-        return;
-      }
-
-      throw error;
-    }
-  }
+  const vault = useVaultController();
+  const initializeVaultStatus = vault.initializeStatus;
+  const {
+    session,
+    keyPersistenceError,
+    dismissKeyPersistenceError,
+    login,
+    logout
+  } = usePersistentSession(initializeVaultStatus, () => {
+    dispatchFlow({ type: 'reset' });
+    vault.reset();
+  });
 
   function handleLogout(): void {
-    const activeSession = session;
-
-    if (!activeSession) {
-      return;
-    }
-
     setMenuOpen(false);
+    logout();
+  }
 
-    if (activeSession.outcome === 'in-memory') {
-      setSession(null);
-      setLabelResult(null);
-      setKeyPersistenceError(null);
+  function handleSelectLabel(label: SavedLabel): void {
+    dispatchFlow({ type: 'selectVaultLabel', label });
+    vault.clearSavedState();
+  }
+
+  function handleLabelProceed(pin: string, label: string): void {
+    const shouldSaveUnlockedLabel =
+      labelCameFromVault(flow, label) && vault.status === 'unlocked';
+    dispatchFlow({
+      type: 'showReveal',
+      pin,
+      label,
+      origin: shouldSaveUnlockedLabel ? 'vault' : 'manual'
+    });
+    vault.clearSavedState();
+    if (shouldSaveUnlockedLabel) {
+      void vault.saveUnlockedLabel(label, pin.length);
+    }
+  }
+
+  async function handleSaveToVault(): Promise<void> {
+    if (flow.route !== 'reveal') {
       return;
     }
-
-    forgetMasterKey()
-      .then(() => {
-        setSession(null);
-        setLabelResult(null);
-        setKeyPersistenceError(null);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof ForgetKeyError) {
-          setKeyPersistenceError(error);
-          return;
-        }
-
-        throw error;
-      });
+    await vault.saveLabel(flow.result.label, flow.result.pin.length);
   }
 
-  function toggleTheme(): void {
-    const nextTheme = theme === 'light' ? 'dark' : 'light';
-
-    storeThemePreference(nextTheme);
-    setTheme(nextTheme);
-  }
+  const isPersisted = session?.outcome === 'persisted';
+  const vaultEnrolled =
+    vault.status === 'locked' || vault.status === 'unlocked';
+  const showSaveToVault =
+    isPersisted &&
+    vaultEnrolled &&
+    flow.route === 'reveal' &&
+    flow.origin !== 'vault' &&
+    !vault.isSaved;
 
   function screen(): JSX.Element {
     if (session === undefined) {
@@ -156,23 +85,57 @@ export function App(): JSX.Element {
     }
 
     if (session === null) {
-      return <LoginScreen onConfirm={handleLoginConfirm} />;
+      return <LoginScreen onConfirm={login} />;
     }
 
-    if (!labelResult) {
+    if (flow.route === 'vault') {
       return (
-        <LabelScreen
-          masterKey={session.key}
-          onProceed={(pin, label) => setLabelResult({ pin, label })}
+        <VaultScreen
+          status={vault.status}
+          isBusy={vault.isBusy}
+          savedLabels={vault.savedLabels}
+          diagnosticsEnabled={vault.diagnosticsEnabled}
+          diagnosticEvents={vault.diagnosticEvents}
+          diagnosticRunLabel={vault.diagnosticRunLabel}
+          onEnable={vault.enable}
+          onUnlock={vault.unlock}
+          onLock={vault.lock}
+          onDisable={vault.disable}
+          onSelectLabel={handleSelectLabel}
+          onRemoveLabel={vault.removeLabel}
+          onRunDiagnostics={
+            vault.diagnosticsEnabled ? vault.runDiagnostics : undefined
+          }
+          onExit={() => dispatchFlow({ type: 'closeVault' })}
         />
       );
     }
+
+    if (flow.route === 'label') {
+      return (
+        <LabelScreen
+          key={flow.labelVersion}
+          masterKey={session.key}
+          initialLabel={flow.initialLabel}
+          initialPinLength={flow.initialPinLength}
+          sessionOutcome={session.outcome}
+          vaultStatus={vault.status}
+          onProceed={handleLabelProceed}
+          onOpenVault={() => dispatchFlow({ type: 'openVault' })}
+        />
+      );
+    }
+
     return (
       <RevealScreen
-        pin={labelResult.pin}
-        label={labelResult.label}
+        pin={flow.result.pin}
+        label={flow.result.label}
         revealTime={revealTime}
-        onExit={() => setLabelResult(null)}
+        showSaveToVault={showSaveToVault}
+        isSaveToVaultBusy={vault.isSaveBusy}
+        isSavedToVault={vault.isSaved}
+        onExit={() => dispatchFlow({ type: 'exitReveal' })}
+        onSaveToVault={handleSaveToVault}
       />
     );
   }
@@ -191,13 +154,19 @@ export function App(): JSX.Element {
           <UpdateReadyBanner applyUpdate={applyAppUpdate} />
           <KeyPersistenceWarningBanner
             error={keyPersistenceError}
-            onDismiss={() => setKeyPersistenceError(null)}
+            onDismiss={dismissKeyPersistenceError}
           />
           <div className={styles.screenSlot}>{screen()}</div>
           {menuOpen && (
             <MenuDrawer
               revealTime={revealTime}
+              sessionOutcome={session?.outcome ?? null}
+              vaultStatus={vault.status}
               onChangeRevealTime={setRevealTime}
+              onOpenVault={() => {
+                setMenuOpen(false);
+                dispatchFlow({ type: 'openVault' });
+              }}
               onLogout={handleLogout}
               onClose={() => setMenuOpen(false)}
             />

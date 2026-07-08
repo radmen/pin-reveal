@@ -1,20 +1,33 @@
 import type { JSX } from 'preact';
 import { CapLabel } from './CapLabel';
+import type { VaultStatus } from '../vault-types';
 import styles from './MenuDrawer.module.css';
 
 interface MenuDrawerProps {
   revealTime: number;
+  sessionOutcome: 'persisted' | 'in-memory' | null;
+  vaultStatus: VaultStatus;
   onChangeRevealTime(milliseconds: number): void;
+  onOpenVault(): void;
   onLogout(): void;
   onClose(): void;
 }
 
 export function MenuDrawer({
   revealTime,
+  sessionOutcome,
+  vaultStatus,
   onChangeRevealTime,
+  onOpenVault,
   onLogout,
   onClose
 }: MenuDrawerProps): JSX.Element {
+  const vaultStatusLabel =
+    vaultStatus === 'unlocked'
+      ? 'Unlocked'
+      : vaultStatus === 'locked'
+        ? 'Locked'
+        : 'Off';
   return (
     <div className={styles.drawerRoot}>
       <div onClick={onClose} className={styles.scrim} />
@@ -25,6 +38,24 @@ export function MenuDrawer({
             ✕
           </button>
         </div>
+
+        {sessionOutcome === 'persisted' && (
+          <a
+            href="#vault"
+            onClick={(event) => {
+              event.preventDefault();
+              onClose();
+              onOpenVault();
+            }}
+            className={styles.vaultNavButton}
+          >
+            <span className={styles.vaultNavLabel}>
+              <span className={styles.vaultDot} data-status={vaultStatus} />
+              Vault
+            </span>
+            <span className={styles.vaultNavStatus}>{vaultStatusLabel}</span>
+          </a>
+        )}
 
         <div className={styles.section}>
           <CapLabel>Reveal time</CapLabel>

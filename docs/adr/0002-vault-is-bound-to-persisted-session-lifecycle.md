@@ -1,0 +1,3 @@
+# Vault Is Bound To Persisted Session Lifecycle
+
+The Vault can only be enabled from a Persisted Session, because Saved Labels belong to the same device trust boundary as the stored master key while adding a separate biometric gate for label reuse. Enabling the Vault creates a dedicated local Vault passkey credential, and disabling the Vault from inside an unlocked Vault deletes that credential metadata and all encrypted Saved Labels. If Vault Unlock becomes impossible, the app should direct the user to Forget/logout; that also deletes the persisted master key, Vault passkey registration metadata, and encrypted Saved Labels together so no separate Vault reset path exists.
