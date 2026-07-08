@@ -5,7 +5,6 @@ import { MenuDrawer } from './components/MenuDrawer';
 import { Splash } from './components/Splash';
 import { Topbar } from './components/Topbar';
 import { UpdateReadyBanner } from './components/UpdateReadyBanner';
-import { type SavedLabel } from './vault-persistence';
 import { LabelScreen } from './screens/LabelScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { RevealScreen } from './screens/RevealScreen';
@@ -15,6 +14,7 @@ import { useAppUpdate } from './useAppUpdate';
 import { usePersistentSession } from './usePersistentSession';
 import { useThemePreference } from './useThemePreference';
 import { useVaultController } from './useVaultController';
+import type { SavedLabel } from './vault-types';
 import styles from './App.module.css';
 
 export function App(): JSX.Element {

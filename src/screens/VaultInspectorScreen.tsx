@@ -1,8 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { PrimaryButton } from '../components/PrimaryButton';
-import type { VaultPasskeyDiagnosticEvent } from '../vault-passkey.adapter';
-import type { VaultStatus } from '../useVaultController';
+import type { VaultPasskeyDiagnosticEvent, VaultStatus } from '../vault-types';
 import styles from './VaultScreen.module.css';
 
 type VaultDiagnosticCopyStatus = 'idle' | 'copied' | 'failed';

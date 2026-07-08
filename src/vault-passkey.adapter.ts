@@ -1,3 +1,5 @@
+import type { VaultPasskeyDiagnosticRecorder } from './vault-types';
+
 export class VaultPasskeyError extends Error {
   constructor(cause: unknown) {
     super('Vault Passkey operation failed.', { cause });
@@ -24,15 +26,6 @@ export type VaultPasskeyCreation = {
   prfSalt: Uint8Array<ArrayBuffer>;
   prfOutput: Uint8Array<ArrayBuffer>;
 };
-
-export type VaultPasskeyDiagnosticEvent = {
-  step: string;
-  details: unknown;
-};
-
-export type VaultPasskeyDiagnosticRecorder = (
-  event: VaultPasskeyDiagnosticEvent
-) => void;
 
 type PrfExtensionResults = {
   credProps?: {

@@ -1,4 +1,5 @@
 import { idbGet, idbPut, idbClear } from './idb';
+import type { SavedLabel } from './vault-types';
 
 const DATABASE_NAME = 'pinapp-vault';
 const STORE_NAME = 'vault';
@@ -14,13 +15,6 @@ export type VaultEncryptedData = {
   version: number;
   iv: Uint8Array<ArrayBuffer>;
   ciphertext: Uint8Array<ArrayBuffer>;
-};
-
-export type SavedLabel = {
-  originalLabel: string;
-  normalizedLabel: string;
-  pinLength: number;
-  lastUsedAt: number;
 };
 
 export class VaultPersistenceError extends Error {

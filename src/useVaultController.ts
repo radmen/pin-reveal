@@ -4,8 +4,6 @@ import {
   checkPrfSupport,
   createVaultPasskey,
   getVaultPrfOutput,
-  type VaultPasskeyDiagnosticEvent,
-  type VaultPasskeyDiagnosticRecorder,
   VaultPasskeyCancelledError,
   VaultPasskeyError,
   VaultPasskeyNotSupportedError
@@ -17,13 +15,16 @@ import {
   forgetVault,
   loadVaultCredential,
   loadVaultData,
-  type SavedLabel,
   storeVaultCredential,
   storeVaultData,
   VaultPersistenceError
 } from './vault-persistence';
-
-export type VaultStatus = 'unavailable' | 'unenrolled' | 'locked' | 'unlocked';
+import type {
+  SavedLabel,
+  VaultPasskeyDiagnosticEvent,
+  VaultPasskeyDiagnosticRecorder,
+  VaultStatus
+} from './vault-types';
 
 type UnlockedVault = {
   key: CryptoKey;

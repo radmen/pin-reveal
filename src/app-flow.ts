@@ -1,5 +1,5 @@
 import { normalizeLabel } from './derivation-contract';
-import type { SavedLabel } from './vault-persistence';
+import type { SavedLabel } from './vault-types';
 
 export type LabelResult = {
   pin: string;

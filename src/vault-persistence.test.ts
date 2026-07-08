@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
+import type { SavedLabel } from './vault-types';
 import {
   decryptLabels,
   deriveVaultKey,
@@ -9,7 +10,6 @@ import {
   loadVaultData,
   storeVaultCredential,
   storeVaultData,
-  type SavedLabel,
   type VaultEncryptedData
 } from './vault-persistence';
 

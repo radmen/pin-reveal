@@ -1,9 +1,11 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { PrimaryButton } from '../components/PrimaryButton';
-import type { VaultPasskeyDiagnosticEvent } from '../vault-passkey.adapter';
-import type { SavedLabel } from '../vault-persistence';
-import type { VaultStatus } from '../useVaultController';
+import type {
+  SavedLabel,
+  VaultPasskeyDiagnosticEvent,
+  VaultStatus
+} from '../vault-types';
 import { VaultInspectorScreen } from './VaultInspectorScreen';
 import styles from './VaultScreen.module.css';
 
