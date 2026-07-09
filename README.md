@@ -45,7 +45,7 @@ attacker couldn't already get only by paying a full Argon2id pass.
 
 The complete, frozen derivation contract — every parameter, message format, and
 normalization rule — is specified in
-[`docs/pin-derivation-spec-v2.md`](docs/pin-derivation-spec-v2.md). Treat every
+[`docs/pin-derivation-spec.md`](docs/pin-derivation-spec.md). Treat every
 value there as immutable: changing any of them re-derives every PIN.
 
 ## The Vault (optional)
@@ -69,7 +69,7 @@ decisions behind the Vault and key persistence.
   protection.
 
 This is a personal-scale tool, not a hardware security module. Read
-[the spec's §8 security analysis](docs/pin-derivation-spec-v2.md) for the honest
+[the spec's §8 security analysis](docs/pin-derivation-spec.md) for the honest
 trade-offs.
 
 ## Tech stack
@@ -119,15 +119,15 @@ src/
 ├── vault-*.ts             # Vault persistence, passkey, and types
 └── key-persistence.ts     # non-extractable master-key storage
 docs/
-├── pin-derivation-spec-v2.md   # the frozen derivation spec (read this first)
-├── adr/                        # architecture decision records
-└── agents/                     # agent/triage conventions
-CONTEXT.md                      # domain glossary — the canonical vocabulary
+├── pin-derivation-spec.md   # the frozen derivation spec (read this first)
+├── adr/                     # architecture decision records
+└── agents/                  # agent/triage conventions
+CONTEXT.md                   # domain glossary — the canonical vocabulary
 ```
 
 ## Documentation
 
-- [`docs/pin-derivation-spec-v2.md`](docs/pin-derivation-spec-v2.md) — the frozen derivation contract.
+- [`docs/pin-derivation-spec.md`](docs/pin-derivation-spec.md) — the frozen derivation contract.
 - [`CONTEXT.md`](CONTEXT.md) — domain glossary; use these terms when contributing.
 - [`docs/adr/`](docs/adr/) — architecture decision records.
 
