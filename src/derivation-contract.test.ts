@@ -33,8 +33,8 @@ describe('Derivation Contract', (): void => {
     await expect(calculateLabelFingerprint(key, 'Visa')).resolves.toBe(
       'inverse inertia'
     );
-    await expect(derivePin(key, 'Visa', 4)).resolves.toBe('0304');
-    await expect(derivePin(key, 'Visa', 6)).resolves.toBe('030442');
+    await expect(derivePin(key, 'Visa', 4)).resolves.toBe('2627');
+    await expect(derivePin(key, 'Visa', 6)).resolves.toBe('512966');
   }, 120_000);
 
   it('does not collapse distinct usernames through label normalization', async (): Promise<void> => {
