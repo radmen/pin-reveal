@@ -1,3 +1,56 @@
+<%
+content_security_policy = [
+	"default-src 'self'",
+	"script-src 'self'",
+	"style-src 'self'",
+	"img-src 'self' data:",
+	"font-src 'self'",
+	"connect-src 'self'",
+	"worker-src 'self'",
+	"frame-ancestors 'none'",
+	"base-uri 'none'",
+	"object-src 'none'",
+	"form-action 'self'"
+].join('; ')
+
+permissions_policy = [
+	'accelerometer=()',
+	'ambient-light-sensor=()',
+	'autoplay=()',
+	'bluetooth=()',
+	'browsing-topics=()',
+	'camera=()',
+	'clipboard-read=()',
+	'clipboard-write=()',
+	'display-capture=()',
+	'encrypted-media=()',
+	'fullscreen=()',
+	'gamepad=()',
+	'geolocation=()',
+	'gyroscope=()',
+	'hid=()',
+	'identity-credentials-get=()',
+	'idle-detection=()',
+	'local-fonts=()',
+	'magnetometer=()',
+	'microphone=()',
+	'midi=()',
+	'otp-credentials=()',
+	'payment=()',
+	'picture-in-picture=()',
+	'publickey-credentials-create=(self)',
+	'publickey-credentials-get=(self)',
+	'screen-wake-lock=()',
+	'serial=()',
+	'speaker-selection=()',
+	'storage-access=()',
+	'usb=()',
+	'web-share=()',
+	'window-management=()',
+	'xr-spatial-tracking=()'
+].join(', ')
+%>
+
 daemon off;
 # stay attached to the dyno process, run in Procfile / web
 
@@ -41,6 +94,13 @@ http {
 		server_name _;
 		keepalive_timeout 5;
 		client_max_body_size <%= ENV['NGINX_CLIENT_MAX_BODY_SIZE'] || 1 %>M;
+
+		add_header Content-Security-Policy "<%= content_security_policy %>" always;
+		add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+		add_header X-Frame-Options "DENY" always;
+		add_header X-Content-Type-Options "nosniff" always;
+		add_header Referrer-Policy "no-referrer" always;
+		add_header Permissions-Policy "<%= permissions_policy %>" always;
 
 		<% if !%w[false 0 no off].include?(ENV.fetch('NGINX_HTTPS_REDIRECT', 'true').downcase) %>
 		## HTTPS Only
