@@ -20,11 +20,15 @@ export function normalizeLabel(rawLabel: string): string {
   return normalizedLabel;
 }
 
+function normalizeUsername(rawUsername: string): string {
+  return rawUsername.normalize('NFC').trim();
+}
+
 export async function deriveKey(
   password: string,
   username: string
 ): Promise<CryptoKey> {
-  const salt = encode(`pinapp|v1|salt|${normalizeLabel(username)}`);
+  const salt = encode(`pinapp|v1|salt|${normalizeUsername(username)}`);
   const rawKey = await argon2idAsync(encode(password), salt, {
     t: 3,
     m: 65536,

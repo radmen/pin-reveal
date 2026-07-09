@@ -21,7 +21,7 @@ password ──Argon2id(salt=username)──▶ master key
 ```
 
 Changing **any** link — Argon2id parameters, the salt rule, the HMAC message
-format, the normalization function, the digit-extraction rule, the word
+format, the normalization rules, the digit-extraction rule, the word
 list — silently changes the output for **every** label.
 
 Because this app is **stateless** (it stores only the master key, nothing
@@ -84,7 +84,7 @@ slow KDF in step 2 — once the key is high-entropy, HMAC is sufficient and fast
 ```
 master_key = Argon2id(
     password = utf8(password),
-    salt     = utf8("pinapp|v1|salt|" + normalize(username)),
+    salt     = utf8("pinapp|v1|salt|" + normalizeUsername(username)),
     t (iterations)  = 3,
     m (memory KiB)  = 65536,        # 64 MiB
     p (parallelism) = 1,
@@ -94,9 +94,16 @@ master_key = Argon2id(
 
 ### Salt = username (must be reproducible)
 
-The salt is the **username**, normalized with the §5 function. A random
-per-install salt would be lost on device loss and break recover-from-memory, so
-the salt must come from something you re-type: the username is exactly that.
+The salt is the **username**, normalized with an identity-appropriate rule:
+**NFC + trim**. A random per-install salt would be lost on device loss and break
+recover-from-memory, so the salt must come from something you re-type: the
+username is exactly that.
+
+This salt rule deliberately does **not** use the §5 label normalization. Usernames
+are identities, not `[a-z0-9-]` selectors, so case, punctuation, internal
+whitespace, and non-ASCII letters remain significant. NFC and trimming only remove
+the invisible footguns of composed/decomposed Unicode and accidental leading or
+trailing spaces.
 
 - Trade-off: a memorized identifier is not high-entropy, so it doesn't defend
   against a precomputed attack the way a random salt would. At this stakes level,
@@ -365,8 +372,13 @@ import { WORDS }    from './wordlist-v1.js';   // frozen, length === 256
 
 const enc = (s) => new TextEncoder().encode(s);
 
-// ── §5 normalization (frozen v1) ───────────────────────────────
-export function normalize(raw) {
+// ── §3 username normalization (frozen v1) ──────────────────────
+export function normalizeUsername(raw) {
+  return raw.normalize('NFC').trim();
+}
+
+// ── §5 label normalization (frozen v1) ─────────────────────────
+export function normalizeLabel(raw) {
   let s = raw.normalize('NFC');
   s = s.toLowerCase();                                  // locale-invariant in JS
   s = s.replace(/ł/g, 'l').replace(/ø/g, 'o').replace(/đ/g, 'd');
@@ -379,7 +391,7 @@ export function normalize(raw) {
 
 // ── §3 + §10 derive, import NON-EXTRACTABLE, zero raw bytes ─────
 export async function deriveKey(password, username) {
-  const salt = enc('pinapp|v1|salt|' + normalize(username));
+  const salt = enc('pinapp|v1|salt|' + normalizeUsername(username));
   const raw  = argon2id(enc(password), salt, { t: 3, m: 65536, p: 1, dkLen: 32 });
   const key  = await crypto.subtle.importKey(
     'raw', raw,
@@ -410,7 +422,7 @@ async function digits(key, baseMsg, count) {
 
 // ── §4/§6 PIN ──────────────────────────────────────────────────
 export async function derivePin(key, rawLabel, length = 4) {
-  return (await digits(key, `pin|v1|${normalize(rawLabel)}`, length)).join('');
+  return (await digits(key, `pin|v1|${normalizeLabel(rawLabel)}`, length)).join('');
 }
 
 // ── §7 word fingerprints ───────────────────────────────────────
@@ -419,7 +431,7 @@ async function twoWords(key, message) {
   return `${WORDS[m[0]]} ${WORDS[m[1]]}`;
 }
 export const loginFingerprint = (key)           => twoWords(key, 'login|v1');
-export const labelFingerprint = (key, rawLabel) => twoWords(key, `fp|v1|${normalize(rawLabel)}`);
+export const labelFingerprint = (key, rawLabel) => twoWords(key, `fp|v1|${normalizeLabel(rawLabel)}`);
 
 // ── §10 persistence: store/load/forget the CryptoKey itself ────
 const DB = 'pinapp', STORE = 'keys', ID = 'master';
@@ -478,11 +490,12 @@ export async function forgetKey() {              // the only real "logout"
 Changing any item below re-derives outputs and forces manual rotation:
 
 - [ ] Argon2id: `t=3, m=65536, p=1, dkLen=32`
-- [ ] Salt rule: `"pinapp|v1|salt|" + normalize(username)`
+- [ ] Salt rule: `"pinapp|v1|salt|" + normalizeUsername(username)`
 - [ ] PIN message: `"pin|v1|" + label [+ "|" + n]`
 - [ ] Label-FP message: `"fp|v1|" + label`
 - [ ] Login-FP message: `"login|v1"`
-- [ ] Normalization v1 (the 7 steps + `ł/ø/đ` map)
+- [ ] Username normalization v1 (NFC + trim)
+- [ ] Label normalization v1 (the 7 steps + `ł/ø/đ` map)
 - [ ] Digit rule: reject `≥250`, then `mod 10`
 - [ ] HMAC output length: full SHA-256 (256 bits) — default at `importKey`
 - [ ] WORD list (exactly 256, in order)

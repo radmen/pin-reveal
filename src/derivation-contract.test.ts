@@ -28,12 +28,22 @@ describe('Derivation Contract', (): void => {
     );
 
     await expect(calculateLoginFingerprint(key)).resolves.toBe(
-      'commence corporate'
+      'inverse detergent'
     );
     await expect(calculateLabelFingerprint(key, 'Visa')).resolves.toBe(
-      'tracker phonetic'
+      'inverse inertia'
     );
-    await expect(derivePin(key, 'Visa', 4)).resolves.toBe('6530');
-    await expect(derivePin(key, 'Visa', 6)).resolves.toBe('653082');
+    await expect(derivePin(key, 'Visa', 4)).resolves.toBe('0304');
+    await expect(derivePin(key, 'Visa', 6)).resolves.toBe('030442');
+  }, 120_000);
+
+  it('does not collapse distinct usernames through label normalization', async (): Promise<void> => {
+    const password = 'correct horse battery staple';
+    const dottedKey = await deriveKey(password, 'user@example.com');
+    const strippedKey = await deriveKey(password, 'userexamplecom');
+
+    await expect(calculateLoginFingerprint(dottedKey)).resolves.not.toBe(
+      await calculateLoginFingerprint(strippedKey)
+    );
   }, 120_000);
 });
