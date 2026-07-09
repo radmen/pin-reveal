@@ -218,8 +218,9 @@ deterministic, never re-roll randomly.
 
 ## 7. Fingerprints (word-based, non-secret)
 
-Two fingerprints, same mechanism, both **two words** from a single frozen
-256-word list. Words are chosen over emoji/color because the high-value check
+Two fingerprints, same mechanism, both **two words** from the frozen PGP
+biometric word list — a pair of 256-word columns (`even` and `odd`). Words are
+chosen over emoji/color because the high-value check
 here is unambiguous recognition with zero rendering dependency: text reads the
 same on every device and can be confirmed aloud.
 
@@ -231,10 +232,17 @@ same on every device and can be confirmed aloud.
 ### Mechanism
 
 ```
-word_0 = WORDS[ bytes[0] ]        # one byte → one word
-word_1 = WORDS[ bytes[1] ]        # 256 words, 256 | 256  → unbiased, no rejection
+word_0 = EVEN[ bytes[0] ]         # first position  → "even" column (256 words)
+word_1 = ODD[ bytes[1] ]          # second position → "odd" column  (256 words)
 fingerprint = word_0 + " " + word_1
 ```
+
+Each column has 256 entries, so each byte maps to exactly one word with no
+rejection sampling (256 | 256 → unbiased). Drawing the two positions from
+**different** columns is the defining property of the PGP biometric word list:
+because the columns share no words, a reader who transposes the two spoken words
+produces a pair that can never be a valid `even odd` sequence, so the swap is
+caught. Index = byte value (0–255) into the column for that position.
 
 Two words = 16 bits ≈ **65,536** combinations. For both uses you are comparing
 the real input against a handful of near-misses (the right password vs. a few
@@ -254,16 +262,19 @@ that the words appear only *after* the (deliberately slow) Argon2id run, which i
 correct: a once-per-session check, not per-keystroke. Anything fast enough to
 update live is fast enough to be the oracle.
 
-### WORD list (frozen, 256 entries)
+### WORD list (frozen, two columns of 256 entries)
 
-Vendor an exact, ordered 256-word list — recommended source: the **PGP biometric
-word list** (one of its two 256-word columns), built for read-aloud phonetic
-distinctness. EFF/Diceware filtered to 256 also works. The list must be committed
-verbatim in the implementation; index = byte value (0–255).
+Vendor the **PGP biometric word list** verbatim: two ordered 256-word columns,
+`even` and `odd`, built for read-aloud phonetic distinctness. The first
+fingerprint position indexes the `even` column, the second indexes the `odd`
+column (see the mechanism above). Both columns are committed as
+`derivation-contract/words.json` (`{ "even": [...256], "odd": [...256] }`);
+index = byte value (0–255) within the position's column.
 
-> The word list is frozen. Reordering or substituting it re-derives every
-> fingerprint (PINs are unaffected — different message namespace). It is
-> recognition-only: show briefly, never log or sync, treat like SSH randomart.
+> The word list is frozen. Reordering, substituting, or swapping the two columns
+> re-derives every fingerprint (PINs are unaffected — different message
+> namespace). It is recognition-only: show briefly, never log or sync, treat like
+> SSH randomart.
 
 ---
 
@@ -367,7 +378,7 @@ copy it into logs, React state, or any longer-lived variable.
 
 ```js
 import { argon2id } from '@noble/hashes/argon2';
-import { WORDS }    from './wordlist-v1.js';   // frozen, length === 256
+import WORDS        from './words.json';        // frozen { even: [...256], odd: [...256] }
 
 const enc = (s) => new TextEncoder().encode(s);
 
@@ -427,7 +438,7 @@ export async function derivePin(key, rawLabel, length = 4) {
 // ── §7 word fingerprints ───────────────────────────────────────
 async function twoWords(key, message) {
   const m = await mac(key, message);
-  return `${WORDS[m[0]]} ${WORDS[m[1]]}`;
+  return `${WORDS.even[m[0]]} ${WORDS.odd[m[1]]}`;
 }
 export const loginFingerprint = (key)           => twoWords(key, 'login|v1');
 export const labelFingerprint = (key, rawLabel) => twoWords(key, `fp|v1|${normalizeLabel(rawLabel)}`);
@@ -497,5 +508,5 @@ Changing any item below re-derives outputs and forces manual rotation:
 - [ ] Label normalization v1 (the 7 steps + `ł/ø/đ` map)
 - [ ] Digit rule: reject `≥250`, then `mod 10`
 - [ ] HMAC output length: full SHA-256 (256 bits) — default at `importKey`
-- [ ] WORD list (exactly 256, in order)
+- [ ] WORD list (PGP biometric list: `even` + `odd`, exactly 256 each, in order; `even` for position 0, `odd` for position 1)
 - [ ] Contract namespace string `v1`
