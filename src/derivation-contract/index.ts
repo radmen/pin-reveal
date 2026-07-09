@@ -106,7 +106,7 @@ export async function derivePin(
 ): Promise<string> {
   const digits = await calculateDigits(
     key,
-    `pin|v1|${normalizeLabel(rawLabel)}`,
+    `pin|v1|${length}|${normalizeLabel(rawLabel)}`,
     length
   );
   return digits.join('');
