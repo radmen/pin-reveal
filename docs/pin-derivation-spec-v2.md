@@ -17,7 +17,7 @@ Every value in **§3–§6** is part of an immutable derivation contract. The ch
 password ──Argon2id(salt=username)──▶ master key
                                        ├─HMAC "login|v1" ─▶ 2 words  (credential check)
                                        ├─HMAC "fp|v1|"+label ─▶ 2 words  (label check)
-                                       └─HMAC "pin|v1|"+label ─▶ reject+mod10 ─▶ PIN
+                                       └─HMAC "pin|v1|"+length+"|"+label ─▶ reject+mod10 ─▶ PIN
 ```
 
 Changing **any** link — Argon2id parameters, the salt rule, the HMAC message
@@ -126,7 +126,7 @@ Three **domain-separated** messages off the same master key, so no derivation
 can reveal anything about another:
 
 ```
-pin_bytes_n  = HMAC-SHA256(master_key, "pin|v1|" + label [+ "|" + n])
+pin_bytes_n  = HMAC-SHA256(master_key, "pin|v1|" + length + "|" + label [+ "|" + n])
 fp_bytes     = HMAC-SHA256(master_key, "fp|v1|"  + label)
 login_bytes  = HMAC-SHA256(master_key, "login|v1")
 ```
@@ -136,6 +136,8 @@ login_bytes  = HMAC-SHA256(master_key, "login|v1")
 - `login|` → the credential fingerprint, two words (§7). Note it takes **no
   label** — it is a property of the username/password pair alone.
 
+- `length` is the selected PIN length (`4`, `6`, or `8`). It is included so each
+  length gets an independent digit stream.
 - `label` is the **normalized** selector (§5).
 - `|` is a safe delimiter: normalized labels are `[a-z0-9-]`, so `|` cannot
   appear inside one (no ambiguity / injection across fields).
@@ -205,11 +207,8 @@ function digits(master_key, base_message, count):
         n = n + 1
 ```
 
-PIN length is a per-derivation **option** (4 / 6 / 8). Shorter PINs are *not*
-prefixes of longer ones here (each length is just `count` digits off the same
-stream — a 4-digit PIN is the first 4 of the 6-digit one, since the stream is
-identical; if you want length-independence instead, fold length into the message.
-**Default: same stream, prefix-compatible.**)
+PIN length is a per-derivation **option** (4 / 6 / 8). The selected length is
+part of the PIN HMAC message, so shorter PINs are not prefixes of longer ones.
 
 Other keypad constraints (no repeats, no runs) are applied by **rejecting whole
 candidate PINs** and pulling the next `count` digits from the stream — keep it
@@ -422,7 +421,7 @@ async function digits(key, baseMsg, count) {
 
 // ── §4/§6 PIN ──────────────────────────────────────────────────
 export async function derivePin(key, rawLabel, length = 4) {
-  return (await digits(key, `pin|v1|${normalizeLabel(rawLabel)}`, length)).join('');
+  return (await digits(key, `pin|v1|${length}|${normalizeLabel(rawLabel)}`, length)).join('');
 }
 
 // ── §7 word fingerprints ───────────────────────────────────────
@@ -491,7 +490,7 @@ Changing any item below re-derives outputs and forces manual rotation:
 
 - [ ] Argon2id: `t=3, m=65536, p=1, dkLen=32`
 - [ ] Salt rule: `"pinapp|v1|salt|" + normalizeUsername(username)`
-- [ ] PIN message: `"pin|v1|" + label [+ "|" + n]`
+- [ ] PIN message: `"pin|v1|" + length + "|" + label [+ "|" + n]`
 - [ ] Label-FP message: `"fp|v1|" + label`
 - [ ] Login-FP message: `"login|v1"`
 - [ ] Username normalization v1 (NFC + trim)
