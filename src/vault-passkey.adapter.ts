@@ -363,18 +363,9 @@ export async function createVaultPasskey(
     };
   }
 
-  if (!extensionResults.prf?.enabled) {
-    recordDiagnosticEvent(recordDiagnostic, 'create.result', {
-      supported: false,
-      reason: 'create-prf-not-enabled',
-      enabled: extensionResults.prf?.enabled ?? null
-    });
-
-    throw new VaultPasskeyNotSupportedError();
-  }
-
   recordDiagnosticEvent(recordDiagnostic, 'create.fallback-to-assertion', {
-    reason: 'create-prf-enabled-without-output'
+    reason: 'create-prf-output-missing',
+    enabled: extensionResults.prf?.enabled ?? null
   });
 
   const prfOutput = await getVaultPrfOutput(
